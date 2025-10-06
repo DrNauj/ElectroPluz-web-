@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Customer Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <div class="container">
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'profile' %}active{% endif %}" href="{% url 'profile' %}">
+                    <i class="fas fa-user"></i> Mi Perfil
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'orders' %}active{% endif %}" href="{% url 'orders' %}">
+                    <i class="fas fa-shopping-bag"></i> Mis Compras
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'cart' %}active{% endif %}" href="{% url 'cart' %}">
+                    <i class="fas fa-shopping-cart"></i> Carrito
+                    {% if cart_count %}
+                    <span class="badge bg-primary">{{ cart_count }}</span>
+                    {% endif %}
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<div class="container">
+    {% block customer_content %}
+    {% endblock %}
+</div>
+{% endblock %}

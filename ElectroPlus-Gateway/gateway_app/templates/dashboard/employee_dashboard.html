@@ -1,0 +1,128 @@
+{% extends 'base/dashboard_base.html' %}
+
+{% block title %}Panel de Empleado{% endblock %}
+
+{% block dashboard_content %}
+<div class="container-fluid">
+    <h1 class="h3 mb-4">Panel de Empleado</h1>
+    
+    {% if error %}
+    <div class="alert alert-danger">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if employee_info %}
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card shadow">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Información del Empleado</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <p class="mb-0 font-weight-bold">ID:</p>
+                        </div>
+                        <div class="col-sm-8">
+                            <p class="text-muted mb-0">{{ employee_info.employee_id }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <p class="mb-0 font-weight-bold">Nombre:</p>
+                        </div>
+                        <div class="col-sm-8">
+                            <p class="text-muted mb-0">{{ employee_info.nombre }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <p class="mb-0 font-weight-bold">Departamento:</p>
+                        </div>
+                        <div class="col-sm-8">
+                            <p class="text-muted mb-0">{{ employee_info.departamento }}</p>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <p class="mb-0 font-weight-bold">Posición:</p>
+                        </div>
+                        <div class="col-sm-8">
+                            <p class="text-muted mb-0">{{ employee_info.posicion }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if tasks %}
+    <div class="row">
+        <div class="col-lg-12">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Tareas Pendientes</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" id="taskTable" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Tarea</th>
+                                    <th>Prioridad</th>
+                                    <th>Fecha Límite</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for task in tasks %}
+                                <tr>
+                                    <td>{{ task.id }}</td>
+                                    <td>{{ task.descripcion }}</td>
+                                    <td>
+                                        <span class="badge badge-{% if task.prioridad == 'Alta' %}danger{% elif task.prioridad == 'Media' %}warning{% else %}info{% endif %}">
+                                            {{ task.prioridad }}
+                                        </span>
+                                    </td>
+                                    <td>{{ task.fecha_limite|date:"d/m/Y" }}</td>
+                                    <td>
+                                        <span class="badge badge-{% if task.estado == 'Pendiente' %}warning{% elif task.estado == 'En Progreso' %}primary{% else %}success{% endif %}">
+                                            {{ task.estado }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="updateTaskStatus({{ task.id }})">
+                                            Actualizar Estado
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updateTaskStatus(taskId) {
+    // Implementar actualización de estado
+}
+
+$(document).ready(function() {
+    $('#taskTable').DataTable();
+});
+</script>
+{% endblock %}

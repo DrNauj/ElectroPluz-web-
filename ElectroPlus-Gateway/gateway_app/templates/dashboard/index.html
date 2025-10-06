@@ -1,0 +1,46 @@
+{% extends "layouts/employee_layout.html" %}
+
+{% block dashboard_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+</div>
+
+<!-- Loading placeholder until data loads -->
+<div class="row mb-4 placeholder-glow">
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Ventas Totales</h5>
+                <h2 class="placeholder">$0.00</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Productos en Stock</h5>
+                <h2 class="placeholder">0</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Pedidos Pendientes</h5>
+                <h2 class="placeholder">0</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Aquí irá el código JavaScript para cargar los datos reales
+document.addEventListener('DOMContentLoaded', function() {
+    loadDashboardData();
+});
+
+function loadDashboardData() {
+    // Implementar carga de datos
+}
+</script>
+{% endblock %}

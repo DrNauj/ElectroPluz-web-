@@ -1,0 +1,15 @@
+import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ventas_core.settings')
+application = get_wsgi_application()
+
+from ventas.models import Cliente, Venta
+
+try:
+    # Intentar hacer una consulta simple
+    clientes = Cliente.objects.all()
+    print("Conexión exitosa al microservicio de Ventas!")
+    print(f"Número de clientes: {clientes.count()}")
+except Exception as e:
+    print(f"Error al conectar: {e}")

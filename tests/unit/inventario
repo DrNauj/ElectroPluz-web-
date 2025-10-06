@@ -1,0 +1,15 @@
+import os
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'inventario_core.settings')
+application = get_wsgi_application()
+
+from productos.models import Categoria, Proveedor, Producto
+
+try:
+    # Intentar hacer una consulta simple
+    categorias = Categoria.objects.all()
+    print("Conexión exitosa al microservicio de Inventario!")
+    print(f"Número de categorías: {categorias.count()}")
+except Exception as e:
+    print(f"Error al conectar: {e}")

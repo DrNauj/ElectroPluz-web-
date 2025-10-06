@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+
+{% block title %}Carrito - ElectroPlus{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Tu carrito</h1>
+    {% if cart %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Producto ID</th>
+                <th>Cantidad</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for key,item in cart.items %}
+            <tr>
+                <td>{{ item.product_id }}</td>
+                <td>{{ item.cantidad }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{% url 'catalog' %}" class="btn btn-primary">Seguir comprando</a>
+    {% else %}
+    <p>Tu carrito está vacío.</p>
+    <a href="{% url 'catalog' %}" class="btn btn-primary">Ir al catálogo</a>
+    {% endif %}
+</div>
+{% endblock %}

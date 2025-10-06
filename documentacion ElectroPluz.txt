@@ -1,0 +1,154 @@
+﻿GUÍA DETALLADA: IMPLEMENTACIÓN DE MICROSERVICIOS (EVIDENCIA 3)
+Este documento es una guía paso a paso para cumplir con los requisitos de la Evidencia 3 del curso de Análisis y Diseño de Software, utilizando Django y Django REST Framework (DRF).
+OBJETIVO PRINCIPAL
+Construir una arquitectura de microservicios para la aplicación ElectroPlus S.A.C., desplegar las APIs en la web (usando Railway) y crear un API Gateway para consolidar los datos.
+1. NUEVA ARQUITECTURA DE MICROSERVICIOS
+La arquitectura se divide en los siguientes componentes:
+* Componente: Microservicio 1: M-Inventario
+   * Tecnología: Django (DRF)
+   * Responsabilidad: Gestión de productos, stock y categorías.
+   * Base de Datos (BD): MySQL (Compartida en Railway)
+* Componente: Microservicio 2: M-Ventas
+   * Tecnología: Django (DRF)
+   * Responsabilidad: Gestión de transacciones, clientes y vendedores.
+   * Base de Datos (BD): MySQL (Compartida en Railway)
+* Componente: API Gateway (Integrador)
+   * Tecnología: Django
+   * Responsabilidad: Ruteo, autenticación de entrada y combinación de datos.
+   * Base de Datos (BD): NO tiene BD.
+* Componente: Programa Cliente
+   * Tecnología: App Web (Django)
+   * Responsabilidad: Interfaz que consume solo el API Gateway.
+   * Base de Datos (BD): NO tiene BD.
+2. ESPECIFICACIONES TÉCNICAS DETALLADAS
+2.1. Stack Tecnológico, Tipos y Versiones
+* Backend/Core:
+   * Tipo: Lenguaje
+   * Tecnología: Python (Versión Sugerida: 3.10+)
+* Framework Web:
+   * Tipo: Backend
+   * Tecnología: Django (Versión Sugerida: 4.2+ LTS)
+   * Dependencia: Django
+* APIs:
+   * Tipo: Backend
+   * Tecnología: Django REST Framework (DRF) (Versión Sugerida: 3.14+)
+   * Dependencia: djangorestframework
+* Servidor BD:
+   * Tipo: Persistencia
+   * Tecnología: MySQL (Versión Sugerida: 8.0+)
+   * Dependencia: mysqlclient
+* Servidor App:
+   * Tipo: WSGI
+   * Tecnología: Gunicorn (Versión Sugerida: 21.2+)
+   * Dependencia: gunicorn
+* Comunicación:
+   * Tipo: HTTP Client
+   * Tecnología: Requests (Versión Sugerida: 2.31+)
+   * Dependencia: requests
+2.2. Estructura de Directorios (Rutas Clave)
+Microservicio 1 (M-Inventario)
+ElectroPlus-M-Inventario/
+├── inventario_core/      # Directorio de configuración principal
+│   ├── settings.py       # Configuración de BD y Apps
+│   └── urls.py           # Rutas globales
+├── productos/            # App de Django para Productos
+│   ├── models.py         # Modelos: Productos, Categorias
+│   ├── serializers.py    # Serializadores de DRF
+│   ├── views.py          # Lógica de las APIs (GET, PATCH)
+│   └── urls.py           # Rutas internas de la App
+├── Procfile              # Comando de Gunicorn para Railway
+└── requirements.txt      # Listado de dependencias
+
+
+La estructura de M-Ventas y el API Gateway es análoga, sustituyendo la carpeta de dominio (productos/ por ventas/ o gateway_app/).
+2.3. Estrategia de Persistencia y Conexión a la BD
+1. Persistencia Física: Ambos Microservicios se conectan a una única instancia de MySQL en Railway.
+2. Conexión (settings.py): Se usan variables de entorno (MYSQL_HOST, MYSQL_USER, etc.) inyectadas por Railway.
+3. Lógica de Conexión: El ORM de Django gestiona la conexión usando el adaptador mysqlclient.
+4. Separación Lógica: Cada microservicio solo carga los modelos que necesita. M-Inventario NO tiene el modelo Ventas.
+3. LÓGICA DE PROGRAMACIÓN Y CONEXIONES (FLUJO ROBUSTO)
+3.1. Lógica Crítica: Realizar Venta (M-Ventas -> M-Inventario)
+Proceso de transacción distribuida:
+1. Recepción (M-Ventas): Recibe el JSON de la venta en POST /api/realizar_venta/.
+2. Validación (M-Ventas): Valida la existencia del cliente y la integridad de los datos usando Serializers.
+3. Inter-Servicio: M-Ventas itera sobre los productos y hace un requests.patch() a M-Inventario para reducir el stock.
+   * CRÍTICO: Incluir la SECRET_KEY en el header para autenticación.
+4. Manejo de Fallas: Si la llamada a M-Inventario falla (ej: 400 Bad Request por falta de stock), M-Ventas lanza una excepción y ABORTA la venta local. Usa response.raise_for_status().
+5. Persistencia: Si TODAS las llamadas a M-Inventario son exitosas, M-Ventas registra Venta y DetalleVenta usando transaction.atomic() de Django para revertir si falla la persistencia local.
+3.2. Lógica del API Gateway (Integrador)
+El Gateway combina datos de ambos servicios:
+1. Recepción: Recibe la solicitud del cliente (ej: GET /api/resumen_cliente/{id}/).
+2. Consumo M-Ventas: Hace requests.get() a M-Ventas para obtener la lista de ventas del cliente.
+3. Consumo M-Inventario: Itera sobre los detalles de venta y hace requests.get() a M-Inventario para obtener los datos enriquecidos del producto (nombre, precio, etc.).
+4. Consolidación: Combina todos los datos en una única respuesta JSON para el Programa Cliente.
+4. ROBUSTECIMIENTO DE LA ARQUITECTURA
+4.1. Seguridad y Autenticación
+* CORS: Configurar django-cors-headers en el API Gateway para permitir la comunicación con el frontend.
+* API Key Inter-Servicio: Originalmente se documentó `SECRET_KEY_MICRO` en los headers HTTP. Nota: `SECRET_KEY_MICRO` fue eliminada; ahora se recomienda usar claves por servicio (`SECRET_INVENTARIO`, `SECRET_VENTAS`) o tokens firmados.
+* API Gateway como Único Punto: Los microservicios deben ser inaccesibles (o desconocidos) para el cliente final.
+4.2. Documentación de APIs
+* Documentación Automática: Usar drf-spectacular o drf-yasg en cada microservicio para generar documentación OpenAPI/Swagger.
+* Uso de Docstrings: Documentar cada vista y serializer en Django con un docstring detallado.
+4.3. Manejo de Errores Estandarizado
+Se debe devolver un JSON consistente para facilitar el manejo de errores en el frontend:
+* Éxito: Código 200 OK / 201 Created. Respuesta: { "status": "success", "data": {...} }
+* Error de Cliente: Código 400 Bad Request. Mensaje: "Datos de entrada inválidos." (Ej: stock insuficiente).
+* No Autorizado: Código 403 Forbidden. Mensaje: "Acceso denegado (API Key inválida)." (Falla en la seguridad inter-servicio).
+* Falla del Servidor: Código 500 Internal Server Error. Mensaje: "Falla interna del servidor."
+4.4. Observabilidad y Logging Centralizado
+1. Logging Estructurado: Configurar el sistema de logging de Python/Django para emitir logs en formato JSON en lugar de texto plano.
+2. Correlación de Logs: En las peticiones HTTP, se debe pasar un identificador único (request_id) en el header, permitiendo trazar una sola transacción a través de toda la arquitectura.
+4.5. Gestión de Variables de Entorno (Entornos Seguros)
+1. Variables de Entorno Local: Usar la librería python-dotenv en desarrollo para cargar credenciales (BD, API Keys) desde un archivo .env local, el cual nunca debe subirse a GitHub.
+2. Variables de Entorno en Producción: Depender únicamente de las variables inyectadas por el servicio de despliegue (Railway). Esto mantiene las credenciales secretas y desacopladas del código.
+5. DOCUMENTACIÓN DEL FRONTEND (PROGRAMA CLIENTE)
+Esta sección detalla los lineamientos para la aplicación web/móvil que consume los servicios.
+5.1. Stack Tecnológico
+* Tecnología: App Web (Se recomienda usar JavaScript para las peticiones HTTP).
+* Rol Principal: Consumidor directo del API Gateway.
+* Librería HTTP: Uso de la API nativa fetch o de la librería axios para llamadas HTTP asíncronas.
+5.2. Lógica de Conexión y Consumo
+1. Punto Único de Acceso: El Frontend solo debe conocer y hacer peticiones al API Gateway (ej: [URL_GATEWAY]/api/resumen_cliente/{id}/). Está prohibido hacer peticiones directas a M-Inventario o M-Ventas.
+2. Manejo de CORS: Las peticiones del cliente serán permitidas gracias a la configuración CORS del Gateway (Sección 4.1).
+3. Manejo de Respuestas: El cliente debe interpretar el formato de respuesta estandarizado (Sección 4.3):
+   * Éxito (200/201): Desplegar los datos en la interfaz del usuario.
+   * Errores (400/500): Mostrar el mensaje de error ("message") de la respuesta JSON en una alerta o caja de diálogo.
+5.3. Estrategia de Despliegue del Frontend
+* URLs Dinámicas: La URL base del API Gateway debe ser configurada a través de una variable de entorno del frontend (ej: VITE_API_GATEWAY_URL si se usa un framework moderno) para cambiar fácilmente entre entornos de desarrollo y producción/Railway.
+6. SUGERENCIAS Y TESTS
+6.1. Sugerencias de Arquitectura (Django)
+* Autenticación Simple de APIs: Usar la SECRET_KEY en los headers HTTP para proteger el stock.
+* Consistencia de Datos: Si M-Ventas falla en la actualización de stock, ABORTAR la transacción de venta local para evitar inconsistencias.
+* Modelos Únicos: La lógica de cada modelo reside exclusivamente en su microservicio.
+6.2. Estrategia de Pruebas Robustas (Nueva Sección)
+Para asegurar la calidad de la arquitectura, se deben aplicar pruebas en tres niveles:
+1. Pruebas Unitarias:
+   * Objetivo: Verificar la lógica interna de los modelos, serializadores y funciones de utilidad de cada microservicio de forma aislada.
+   * Ejemplo: Probar que la función de cálculo de impuestos en M-Ventas sea correcta.
+2. Pruebas de Integración (CRÍTICAS para la Evidencia 3):
+   * Objetivo: Verificar la comunicación HTTP y la lógica de transacción distribuida entre M-Ventas y M-Inventario.
+   * Ejemplo: Simular una venta y comprobar que el stock se actualice correctamente en el otro microservicio.
+3. Pruebas End-to-End (E2E):
+   * Objetivo: Verificar el flujo completo desde la solicitud del cliente hasta la respuesta consolidada del API Gateway.
+   * Ejemplo: Simular una llamada del Frontend al Gateway y asegurar que los datos consolidados sean correctos.
+6.3. Casos de Prueba Clave (Para Postman/Insomnia)
+Los siguientes tests deben ser ejecutados y verificados:
+A. Flujo de Éxito (Comprobación de Funcionalidad)
+Test
+	Componente
+	URL / Acción
+	CONSULTA LA DOCUMENTACIÓN UNIFICADA
+
+	Este archivo fue consolidado en `documentacion_unificada.md`.
+
+	Abre `documentacion_unificada.md` para ver la guía completa de implementación, arquitectura, pruebas, problemas detectados y recomendaciones.
+
+	Archivo maestro: `documentacion_unificada.md`
+	TEST 5: Error de Formato
+	M-Ventas
+	[URL_M_VENTAS]/api/realizar_venta/ enviando un JSON inválido (ej: un número en lugar de una lista de productos).
+	POST
+	400 Bad Request con mensaje de error de validación de DRF.
+	Validación de entrada (Serializers de DRF).
+	7. GITHUB Y ARTEFACTOS FINALES (Actividad 4)
+Documentación en GitHub: Incluye este archivo README en tu repositorio principal.

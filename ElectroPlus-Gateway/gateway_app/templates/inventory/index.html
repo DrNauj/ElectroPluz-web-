@@ -1,0 +1,265 @@
+{% extends "layouts/employee_layout.html" %}
+{% load static %}
+
+{% block title %}Gestión de Inventario - ElectroPlus{% endblock %}
+
+{% block page_title %}Gestión de Inventario{% endblock %}
+
+{% block breadcrumbs %}
+<li class="breadcrumb-item"><a href="{% url 'dashboard' %}">Dashboard</a></li>
+<li class="breadcrumb-item active">Inventario</li>
+{% endblock %}
+
+{% block employee_content %}
+<!-- Filtros y Acciones -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <!-- Filtros -->
+            <div class="col-md-8">
+                <div class="row g-2">
+                    <div class="col-md-4">
+                        <select class="form-select" id="categoryFilter">
+                            <option value="">Todas las categorías</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="stockFilter">
+                            <option value="">Estado de stock</option>
+                            <option value="low">Stock bajo</option>
+                            <option value="out">Sin stock</option>
+                            <option value="normal">Stock normal</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="searchInput" placeholder="Buscar productos...">
+                            <button class="btn btn-outline-primary" type="button">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Acciones -->
+            <div class="col-md-4 text-md-end">
+                <button class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                    <i class="fas fa-plus me-2"></i>Nuevo Producto
+                </button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
+                    <i class="fas fa-file-import me-2"></i>Importar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen de Inventario -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="flex-shrink-0">
+                    <div class="stats-icon bg-primary bg-opacity-10 text-primary p-3 rounded">
+                        <i class="fas fa-box fa-2x"></i>
+                    </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <h6 class="mb-1">Total Productos</h6>
+                    <h3 class="mb-0">{{ total_products }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="flex-shrink-0">
+                    <div class="stats-icon bg-warning bg-opacity-10 text-warning p-3 rounded">
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
+                    </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <h6 class="mb-1">Stock Bajo</h6>
+                    <h3 class="mb-0">{{ low_stock_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="flex-shrink-0">
+                    <div class="stats-icon bg-danger bg-opacity-10 text-danger p-3 rounded">
+                        <i class="fas fa-times-circle fa-2x"></i>
+                    </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <h6 class="mb-1">Sin Stock</h6>
+                    <h3 class="mb-0">{{ out_of_stock_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stats-card">
+            <div class="d-flex align-items-center">
+                <div class="flex-shrink-0">
+                    <div class="stats-icon bg-success bg-opacity-10 text-success p-3 rounded">
+                        <i class="fas fa-sync-alt fa-2x"></i>
+                    </div>
+                </div>
+                <div class="flex-grow-1 ms-3">
+                    <h6 class="mb-1">Última Actualización</h6>
+                    <p class="mb-0">{{ last_update|date:"d/m/Y H:i" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabla de Productos -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="productsTable">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Producto</th>
+                        <th>Categoría</th>
+                        <th>Precio</th>
+                        <th>Stock</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for product in products %}
+                    <tr>
+                        <td>{{ product.id }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {% if product.imagen %}
+                                <img src="{{ product.imagen.url }}" alt="{{ product.nombre }}" 
+                                     class="rounded me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                {% else %}
+                                <div class="bg-light rounded me-2 d-flex align-items-center justify-content-center" 
+                                     style="width: 40px; height: 40px;">
+                                    <i class="fas fa-box text-muted"></i>
+                                </div>
+                                {% endif %}
+                                <div>
+                                    <h6 class="mb-0">{{ product.nombre }}</h6>
+                                    <small class="text-muted">SKU: {{ product.sku }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>{{ product.categoria.nombre }}</td>
+                        <td>${{ product.precio }}</td>
+                        <td>{{ product.stock }}</td>
+                        <td>
+                            {% if product.stock == 0 %}
+                            <span class="badge bg-danger">Sin Stock</span>
+                            {% elif product.stock <= product.stock_minimo %}
+                            <span class="badge bg-warning">Stock Bajo</span>
+                            {% else %}
+                            <span class="badge bg-success">Normal</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn btn-sm btn-primary me-1" onclick="editProduct({{ product.id }})">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn btn-sm btn-info me-1" onclick="adjustStock({{ product.id }})">
+                                <i class="fas fa-layer-group"></i>
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteProduct({{ product.id }})">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modales -->
+{% include "includes/inventory/add_product_modal.html" %}
+{% include "includes/inventory/edit_product_modal.html" %}
+{% include "includes/inventory/adjust_stock_modal.html" %}
+{% include "includes/inventory/import_modal.html" %}
+{% include "includes/inventory/delete_confirm_modal.html" %}
+
+{% endblock %}
+
+{% block employee_js %}
+<script>
+// Inicializar DataTables
+$(document).ready(function() {
+    const table = $('#productsTable').DataTable({
+        pageLength: 10,
+        order: [[0, 'desc']],
+        language: {
+            url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+        }
+    });
+
+    // Filtros
+    $('#categoryFilter, #stockFilter').on('change', function() {
+        filterProducts();
+    });
+
+    $('#searchInput').on('keyup', function() {
+        table.search(this.value).draw();
+    });
+});
+
+// Función para filtrar productos
+function filterProducts() {
+    const category = $('#categoryFilter').val();
+    const stock = $('#stockFilter').val();
+    
+    table.columns(2).search(category);
+    
+    if (stock) {
+        table.column(5).search(stock === 'out' ? 'Sin Stock' : 
+                             stock === 'low' ? 'Stock Bajo' : 
+                             'Normal').draw();
+    } else {
+        table.column(5).search('').draw();
+    }
+}
+
+// Funciones CRUD
+function editProduct(id) {
+    // Cargar datos del producto
+    fetch(`/api/productos/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+            // Rellenar formulario
+            $('#editProductModal').modal('show');
+        });
+}
+
+function adjustStock(id) {
+    $('#adjustStockModal').modal('show');
+    $('#productId').val(id);
+}
+
+function deleteProduct(id) {
+    $('#deleteConfirmModal').modal('show');
+    $('#deleteProductId').val(id);
+}
+
+// Notificaciones
+function showNotification(message, type = 'success') {
+    showToast(message, type);
+}
+</script>
+{% endblock %}

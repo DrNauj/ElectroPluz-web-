@@ -1,0 +1,253 @@
+{% extends 'base/base.html' %}
+
+{% block title %}Reportes de Ventas - ElectroPlus{% endblock %}
+
+{% block header %}Reportes de Ventas{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Filtros -->
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-body">
+                <form id="form-filtros" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Período</label>
+                        <select class="form-select" id="periodo" name="periodo">
+                            <option value="hoy">Hoy</option>
+                            <option value="semana">Esta semana</option>
+                            <option value="mes">Este mes</option>
+                            <option value="año">Este año</option>
+                            <option value="personalizado">Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Desde</label>
+                        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Hasta</label>
+                        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Vendedor</label>
+                        <select class="form-select" id="vendedor" name="vendedor">
+                            <option value="">Todos</option>
+                            {% for vendedor in vendedores %}
+                            <option value="{{ vendedor.id }}">{{ vendedor.nombre_usuario }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Aplicar Filtros</button>
+                        <button type="button" class="btn btn-secondary" onclick="exportarReporte()">
+                            Exportar a Excel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                Resumen del Período
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-6 mb-3">
+                        <h6 class="text-muted">Total Ventas</h6>
+                        <h3>S/. {{ total_ventas }}</h3>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <h6 class="text-muted">N° Transacciones</h6>
+                        <h3>{{ num_transacciones }}</h3>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Ticket Promedio</h6>
+                        <h3>S/. {{ ticket_promedio }}</h3>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-muted">Productos Vendidos</h6>
+                        <h3>{{ productos_vendidos }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráfico de ventas -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                Tendencia de Ventas
+            </div>
+            <div class="card-body">
+                <canvas id="graficoVentas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top productos -->
+    <div class="col-md-6 mt-4">
+        <div class="card">
+            <div class="card-header">
+                Productos Más Vendidos
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Unidades</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for producto in top_productos %}
+                            <tr>
+                                <td>{{ producto.nombre }}</td>
+                                <td>{{ producto.unidades }}</td>
+                                <td>S/. {{ producto.total }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top vendedores -->
+    <div class="col-md-6 mt-4">
+        <div class="card">
+            <div class="card-header">
+                Top Vendedores
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Vendedor</th>
+                                <th>Ventas</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for vendedor in top_vendedores %}
+                            <tr>
+                                <td>{{ vendedor.nombre }}</td>
+                                <td>{{ vendedor.num_ventas }}</td>
+                                <td>S/. {{ vendedor.total }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('graficoVentas').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ fechas|safe }},
+            datasets: [{
+                label: 'Ventas',
+                data: {{ datos_ventas|safe }},
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Manejar cambio de período
+    document.getElementById('periodo').addEventListener('change', function(e) {
+        const fechasPersonalizadas = document.querySelectorAll('#fecha_inicio, #fecha_fin');
+        fechasPersonalizadas.forEach(input => {
+            input.disabled = e.target.value !== 'personalizado';
+        });
+    });
+});
+
+// Función para exportar reporte
+function exportarReporte() {
+    const filtros = new FormData(document.getElementById('form-filtros'));
+    const queryString = new URLSearchParams(filtros).toString();
+    window.location.href = `/reportes/ventas/exportar/?${queryString}`;
+}
+
+// Enviar formulario de filtros
+document.getElementById('form-filtros').onsubmit = function(e) {
+    e.preventDefault();
+    const filtros = new FormData(this);
+    const queryString = new URLSearchParams(filtros).toString();
+    
+    fetch(`/api/reportes/ventas/?${queryString}`)
+        .then(response => response.json())
+        .then(data => {
+            // Actualizar resumen
+            document.querySelector('[data-stat="total_ventas"]').textContent = 
+                `S/. ${data.total_ventas}`;
+            document.querySelector('[data-stat="num_transacciones"]').textContent = 
+                data.num_transacciones;
+            document.querySelector('[data-stat="ticket_promedio"]').textContent = 
+                `S/. ${data.ticket_promedio}`;
+            document.querySelector('[data-stat="productos_vendidos"]').textContent = 
+                data.productos_vendidos;
+
+            // Actualizar gráfico
+            graficoVentas.data.labels = data.fechas;
+            graficoVentas.data.datasets[0].data = data.datos_ventas;
+            graficoVentas.update();
+
+            // Actualizar tablas
+            actualizarTablaTopProductos(data.top_productos);
+            actualizarTablaTopVendedores(data.top_vendedores);
+        });
+};
+
+function actualizarTablaTopProductos(productos) {
+    const tbody = document.querySelector('#tabla-top-productos tbody');
+    tbody.innerHTML = productos.map(p => `
+        <tr>
+            <td>${p.nombre}</td>
+            <td>${p.unidades}</td>
+            <td>S/. ${p.total}</td>
+        </tr>
+    `).join('');
+}
+
+function actualizarTablaTopVendedores(vendedores) {
+    const tbody = document.querySelector('#tabla-top-vendedores tbody');
+    tbody.innerHTML = vendedores.map(v => `
+        <tr>
+            <td>${v.nombre}</td>
+            <td>${v.num_ventas}</td>
+            <td>S/. ${v.total}</td>
+        </tr>
+    `).join('');
+}
+</script>
+{% endblock %}

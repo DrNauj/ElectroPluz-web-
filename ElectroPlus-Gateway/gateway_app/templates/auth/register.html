@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card auth-card">
+                <div class="card-body">
+                    <h2 class="text-center mb-4">Crear Cuenta</h2>
+                    
+                    <form method="post" action="{% url 'register' %}" class="needs-validation" novalidate>
+                        {% csrf_token %}
+                        
+                        <!-- Nombre -->
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="nombre" name="nombre" required>
+                            <label for="nombre">Nombre completo</label>
+                            <div class="invalid-feedback">
+                                Por favor ingrese su nombre completo
+                            </div>
+                        </div>
+
+                        <!-- Email -->
+                        <div class="form-floating mb-3">
+                            <input type="email" class="form-control" id="email" name="email" required>
+                            <label for="email">Correo electrónico</label>
+                            <div class="invalid-feedback">
+                                Por favor ingrese un correo electrónico válido
+                            </div>
+                        </div>
+
+                        <!-- Username -->
+                        <div class="form-floating mb-3">
+                            <input type="text" class="form-control" id="username" name="username" required>
+                            <label for="username">Nombre de usuario</label>
+                            <div class="invalid-feedback">
+                                Por favor elija un nombre de usuario
+                            </div>
+                        </div>
+
+                        <!-- Password -->
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" id="password1" name="password1" required>
+                            <label for="password1">Contraseña</label>
+                            <div class="invalid-feedback">
+                                La contraseña debe tener al menos 8 caracteres
+                            </div>
+                        </div>
+
+                        <!-- Confirm Password -->
+                        <div class="form-floating mb-3">
+                            <input type="password" class="form-control" id="password2" name="password2" required>
+                            <label for="password2">Confirmar contraseña</label>
+                            <div class="invalid-feedback">
+                                Las contraseñas no coinciden
+                            </div>
+                        </div>
+
+                        <!-- Terms -->
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="terms" name="terms" required>
+                            <label class="form-check-label" for="terms">
+                                Acepto los términos y condiciones
+                            </label>
+                            <div class="invalid-feedback">
+                                Debe aceptar los términos y condiciones
+                            </div>
+                        </div>
+
+                        {% if messages %}
+                        <div class="alert alert-danger">
+                            {% for message in messages %}
+                            {{ message }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-primary w-100 mb-3">
+                            Crear cuenta
+                        </button>
+
+                        <!-- Login Link -->
+                        <div class="text-center">
+                            <p>¿Ya tienes una cuenta? <a href="{% url 'login' %}" class="text-decoration-none">Iniciar sesión</a></p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Validación del formulario
+(function () {
+    'use strict'
+    var forms = document.querySelectorAll('.needs-validation')
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault()
+                event.stopPropagation()
+            }
+            form.classList.add('was-validated')
+        }, false)
+    })
+
+    // Validación de contraseñas
+    var password1 = document.getElementById('password1')
+    var password2 = document.getElementById('password2')
+    
+    function validatePassword(){
+        if(password1.value != password2.value) {
+            password2.setCustomValidity("Las contraseñas no coinciden");
+        } else {
+            password2.setCustomValidity('');
+        }
+    }
+
+    password1.onchange = validatePassword;
+    password2.onkeyup = validatePassword;
+})()
+</script>
+{% endblock %}
