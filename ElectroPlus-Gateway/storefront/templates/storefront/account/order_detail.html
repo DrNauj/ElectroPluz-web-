@@ -1,0 +1,211 @@
+{% extends 'storefront/base/base.html' %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <!-- Sidebar de Cuenta -->
+        <div class="col-md-3">
+            <div class="list-group">
+                <a href="{% url 'storefront:profile' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-user me-2"></i>Mi Perfil
+                </a>
+                <a href="{% url 'storefront:orders' %}" class="list-group-item list-group-item-action active">
+                    <i class="fas fa-box me-2"></i>Mis Pedidos
+                </a>
+                <a href="{% url 'storefront:profile_edit' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-edit me-2"></i>Editar Perfil
+                </a>
+            </div>
+        </div>
+        
+        <!-- Contenido Principal -->
+        <div class="col-md-9">
+            <!-- Cabecera del Pedido -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="row align-items-center">
+                        <div class="col">
+                            <h3 class="card-title mb-0">Pedido #{{ order.id }}</h3>
+                        </div>
+                        <div class="col-auto">
+                            <span class="badge bg-{{ order.status|lower }}">{{ order.status }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>Información del Pedido</h5>
+                            <p><strong>Fecha:</strong> {{ order.created_at|date:"d/m/Y H:i" }}</p>
+                            <p><strong>Método de Pago:</strong> {{ order.payment_method }}</p>
+                            <p><strong>Estado del Pago:</strong> {{ order.payment_status }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Dirección de Envío</h5>
+                            <p>{{ order.shipping_name }}</p>
+                            <p>{{ order.shipping_address }}</p>
+                            <p>{{ order.shipping_city }}, {{ order.shipping_state }} {{ order.shipping_zip }}</p>
+                            <p>{{ order.shipping_country }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Productos del Pedido -->
+                    <h5>Productos</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="text-center">Cantidad</th>
+                                    <th class="text-end">Precio</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order.details %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            {% if item.product_image %}
+                                            <img src="{{ item.product_image }}" alt="{{ item.product_name }}" class="me-3" style="width: 50px;">
+                                            {% endif %}
+                                            <div>
+                                                <h6 class="mb-0">{{ item.product_name }}</h6>
+                                                {% if item.product_code %}<small class="text-muted">SKU: {{ item.product_code }}</small>{% endif %}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-end">${{ item.unit_price }}</td>
+                                    <td class="text-end">${{ item.subtotal }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td class="text-end">${{ order.subtotal }}</td>
+                                </tr>
+                                {% if order.shipping_cost %}
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Envío:</strong></td>
+                                    <td class="text-end">${{ order.shipping_cost }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if order.tax %}
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Impuestos:</strong></td>
+                                    <td class="text-end">${{ order.tax }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                                    <td class="text-end"><strong>${{ order.total }}</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seguimiento del Pedido -->
+            {% if order.tracking_info %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Seguimiento del Envío</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Número de Seguimiento:</strong> {{ order.tracking_info.number }}</p>
+                    <p><strong>Servicio de Envío:</strong> {{ order.tracking_info.carrier }}</p>
+                    <div class="timeline">
+                        {% for event in order.tracking_info.events %}
+                        <div class="timeline-item">
+                            <div class="timeline-date">{{ event.date|date:"d/m/Y H:i" }}</div>
+                            <div class="timeline-content">
+                                <p class="mb-0">{{ event.description }}</p>
+                                <small class="text-muted">{{ event.location }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Botones de Acción -->
+            <div class="row">
+                <div class="col-md-6">
+                    <a href="{% url 'storefront:orders' %}" class="btn btn-secondary w-100">
+                        <i class="fas fa-arrow-left me-2"></i>Volver a Mis Pedidos
+                    </a>
+                </div>
+                {% if order.can_cancel %}
+                <div class="col-md-6">
+                    <form method="post" action="{% url 'storefront:order_cancel' order.id %}" 
+                          onsubmit="return confirm('¿Estás seguro de que deseas cancelar este pedido?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fas fa-times me-2"></i>Cancelar Pedido
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 20px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: -20px;
+    width: 2px;
+    background-color: #dee2e6;
+}
+
+.timeline-item::after {
+    content: '';
+    position: absolute;
+    left: -4px;
+    top: 8px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background-color: #0d6efd;
+}
+
+.timeline-date {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+}
+
+.timeline-content {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.25rem;
+}
+
+.badge.bg-pending { background-color: #ffc107; }
+.badge.bg-processing { background-color: #17a2b8; }
+.badge.bg-shipped { background-color: #28a745; }
+.badge.bg-delivered { background-color: #198754; }
+.badge.bg-cancelled { background-color: #dc3545; }
+</style>
+{% endblock %}
+{% endblock %}

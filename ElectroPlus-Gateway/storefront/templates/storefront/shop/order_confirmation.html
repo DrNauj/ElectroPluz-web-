@@ -1,0 +1,72 @@
+{% extends 'storefront/base/base.html' %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="text-center mb-5">
+        <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+        <h2 class="mt-3">¡Gracias por tu compra!</h2>
+        <p class="lead">Tu pedido ha sido recibido y está siendo procesado.</p>
+    </div>
+
+    <!-- Detalles del Pedido -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Detalles del Pedido #{{ order.id }}</h3>
+        </div>
+        <div class="card-body">
+            <!-- Estado del Pedido -->
+            <div class="mb-4">
+                <h4>Estado del Pedido</h4>
+                <p class="alert alert-info">{{ order.status }}</p>
+            </div>
+
+            <!-- Productos -->
+            <div class="mb-4">
+                <h4>Productos</h4>
+                {% for item in order.details %}
+                <div class="row mb-2">
+                    <div class="col-8">
+                        {{ item.product_name }} x {{ item.quantity }}
+                    </div>
+                    <div class="col-4 text-end">
+                        ${{ item.subtotal }}
+                    </div>
+                </div>
+                {% endfor %}
+                <hr>
+                <div class="row fw-bold">
+                    <div class="col-8">Total:</div>
+                    <div class="col-4 text-end">${{ order.total }}</div>
+                </div>
+            </div>
+
+            <!-- Información de Envío -->
+            <div class="mb-4">
+                <h4>Información de Envío</h4>
+                <p><strong>Nombre:</strong> {{ order.shipping_name }}</p>
+                <p><strong>Dirección:</strong> {{ order.shipping_address }}</p>
+                <p><strong>Ciudad:</strong> {{ order.shipping_city }}</p>
+                <p><strong>Estado/Provincia:</strong> {{ order.shipping_state }}</p>
+                <p><strong>Código Postal:</strong> {{ order.shipping_zip }}</p>
+                <p><strong>País:</strong> {{ order.shipping_country }}</p>
+                <p><strong>Email:</strong> {{ order.email }}</p>
+                <p><strong>Teléfono:</strong> {{ order.phone }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones de Acción -->
+    <div class="row">
+        <div class="col-md-6">
+            <a href="{% url 'storefront:orders' %}" class="btn btn-primary w-100">
+                <i class="fas fa-list me-2"></i>Ver Mis Pedidos
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="{% url 'storefront:home' %}" class="btn btn-secondary w-100">
+                <i class="fas fa-home me-2"></i>Volver a la Tienda
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends 'storefront/base/base.html' %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <h1 class="mb-4">Información de Envíos</h1>
+            
+            <!-- Métodos de Envío -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Métodos de Envío</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="border rounded p-3 h-100">
+                                <h3 class="h5">Envío Estándar</h3>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-clock me-2"></i>3-5 días hábiles</li>
+                                    <li><i class="fas fa-truck me-2"></i>Entrega a domicilio</li>
+                                    <li><i class="fas fa-dollar-sign me-2"></i>Tarifa base: $5.99</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="border rounded p-3 h-100">
+                                <h3 class="h5">Envío Express</h3>
+                                <ul class="list-unstyled">
+                                    <li><i class="fas fa-clock me-2"></i>1-2 días hábiles</li>
+                                    <li><i class="fas fa-truck me-2"></i>Entrega prioritaria</li>
+                                    <li><i class="fas fa-dollar-sign me-2"></i>Tarifa base: $12.99</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Costos de Envío -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Costos de Envío</h2>
+                </div>
+                <div class="card-body">
+                    <p>Los costos de envío se calculan en base a:</p>
+                    <ul>
+                        <li>Peso y dimensiones del paquete</li>
+                        <li>Distancia de envío</li>
+                        <li>Método de envío seleccionado</li>
+                        <li>Zona de entrega</li>
+                    </ul>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        ¡Envío GRATIS en compras superiores a $99!
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Zona</th>
+                                    <th>Envío Estándar</th>
+                                    <th>Envío Express</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Zona 1 (Local)</td>
+                                    <td>$5.99</td>
+                                    <td>$12.99</td>
+                                </tr>
+                                <tr>
+                                    <td>Zona 2 (Regional)</td>
+                                    <td>$8.99</td>
+                                    <td>$15.99</td>
+                                </tr>
+                                <tr>
+                                    <td>Zona 3 (Nacional)</td>
+                                    <td>$11.99</td>
+                                    <td>$19.99</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seguimiento de Envíos -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Seguimiento de Envíos</h2>
+                </div>
+                <div class="card-body">
+                    <p>Una vez que tu pedido sea enviado, recibirás:</p>
+                    <ul>
+                        <li>Email de confirmación con número de seguimiento</li>
+                        <li>Enlace para rastrear tu envío en tiempo real</li>
+                        <li>Actualizaciones de estado por email</li>
+                    </ul>
+
+                    <div class="alert alert-secondary">
+                        <h3 class="h5">¿Cómo rastrear tu envío?</h3>
+                        <ol>
+                            <li>Inicia sesión en tu cuenta</li>
+                            <li>Ve a "Mis Pedidos"</li>
+                            <li>Selecciona el pedido que deseas rastrear</li>
+                            <li>Haz clic en "Rastrear Envío"</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Restricciones y Políticas -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Restricciones y Políticas</h2>
+                </div>
+                <div class="card-body">
+                    <h3 class="h5">Restricciones de Envío</h3>
+                    <ul>
+                        <li>No realizamos envíos a apartados postales</li>
+                        <li>Algunas zonas remotas pueden tener costos adicionales</li>
+                        <li>Ciertos productos pueden tener restricciones de envío</li>
+                    </ul>
+
+                    <h3 class="h5 mt-4">Política de Entregas</h3>
+                    <ul>
+                        <li>Las entregas se realizan de lunes a viernes</li>
+                        <li>Horario de entrega: 9:00 AM - 6:00 PM</li>
+                        <li>Se requiere firma para la recepción del paquete</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Contacto -->
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3 class="h5">¿Tienes preguntas sobre tu envío?</h3>
+                    <p>Nuestro equipo de soporte está listo para ayudarte</p>
+                    <a href="{% url 'storefront:contact' %}" class="btn btn-primary">
+                        <i class="fas fa-envelope me-2"></i>Contáctanos
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

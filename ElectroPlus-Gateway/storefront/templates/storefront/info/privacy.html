@@ -1,0 +1,207 @@
+{% extends 'storefront/base/base.html' %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <h1 class="mb-4">Política de Privacidad</h1>
+            
+            <!-- Introducción -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Introducción</h2>
+                </div>
+                <div class="card-body">
+                    <p>En ElectroPluz, nos tomamos muy en serio la privacidad de nuestros usuarios. 
+                       Esta política describe cómo recopilamos, usamos y protegemos su información personal.</p>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Última actualización: [Fecha]
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información que Recopilamos -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Información que Recopilamos</h2>
+                </div>
+                <div class="card-body">
+                    <h3 class="h5">Información Personal</h3>
+                    <ul>
+                        <li>Nombre y apellidos</li>
+                        <li>Dirección de correo electrónico</li>
+                        <li>Dirección postal</li>
+                        <li>Número de teléfono</li>
+                        <li>Información de pago</li>
+                    </ul>
+
+                    <h3 class="h5 mt-4">Información Automática</h3>
+                    <ul>
+                        <li>Dirección IP</li>
+                        <li>Tipo de navegador</li>
+                        <li>Sistema operativo</li>
+                        <li>Páginas visitadas</li>
+                        <li>Tiempo de permanencia</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Uso de la Información -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Uso de la Información</h2>
+                </div>
+                <div class="card-body">
+                    <p>Utilizamos su información para:</p>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Propósito</th>
+                                    <th>Descripción</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Procesamiento de Pedidos</td>
+                                    <td>Gestionar sus compras y envíos</td>
+                                </tr>
+                                <tr>
+                                    <td>Servicio al Cliente</td>
+                                    <td>Responder a sus consultas y solicitudes</td>
+                                </tr>
+                                <tr>
+                                    <td>Marketing</td>
+                                    <td>Enviar ofertas y novedades (con su consentimiento)</td>
+                                </tr>
+                                <tr>
+                                    <td>Mejora del Servicio</td>
+                                    <td>Analizar y mejorar nuestra plataforma</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Protección de Datos -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Protección de Datos</h2>
+                </div>
+                <div class="card-body">
+                    <h3 class="h5">Medidas de Seguridad</h3>
+                    <ul>
+                        <li>Encriptación SSL</li>
+                        <li>Firewalls y sistemas de seguridad</li>
+                        <li>Acceso restringido a datos personales</li>
+                        <li>Monitoreo constante de seguridad</li>
+                    </ul>
+
+                    <div class="alert alert-warning mt-3">
+                        <i class="fas fa-shield-alt me-2"></i>
+                        Aunque implementamos medidas de seguridad robustas, ningún sistema 
+                        es 100% seguro. Tomamos todas las precauciones razonables para 
+                        proteger su información.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compartir Información -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Compartir Información</h2>
+                </div>
+                <div class="card-body">
+                    <p>Podemos compartir su información con:</p>
+                    <ul>
+                        <li>Proveedores de servicios de envío</li>
+                        <li>Procesadores de pago</li>
+                        <li>Servicios de marketing (con consentimiento)</li>
+                        <li>Autoridades legales (cuando sea requerido)</li>
+                    </ul>
+
+                    <div class="alert alert-info mt-3">
+                        <i class="fas fa-handshake me-2"></i>
+                        Nunca vendemos su información personal a terceros.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cookies -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Cookies</h2>
+                </div>
+                <div class="card-body">
+                    <p>Utilizamos cookies para:</p>
+                    <ul>
+                        <li>Mantener su sesión activa</li>
+                        <li>Recordar sus preferencias</li>
+                        <li>Analizar el uso del sitio</li>
+                        <li>Mejorar la experiencia de usuario</li>
+                    </ul>
+
+                    <div class="alert alert-secondary mt-3">
+                        <i class="fas fa-cookie-bite me-2"></i>
+                        Puede configurar su navegador para rechazar cookies, aunque 
+                        esto puede afectar algunas funcionalidades del sitio.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sus Derechos -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Sus Derechos</h2>
+                </div>
+                <div class="card-body">
+                    <p>Usted tiene derecho a:</p>
+                    <ul>
+                        <li>Acceder a sus datos personales</li>
+                        <li>Corregir información inexacta</li>
+                        <li>Solicitar la eliminación de sus datos</li>
+                        <li>Oponerse al procesamiento de sus datos</li>
+                        <li>Retirar su consentimiento</li>
+                    </ul>
+
+                    <div class="alert alert-primary mt-3">
+                        <i class="fas fa-user-shield me-2"></i>
+                        Para ejercer estos derechos, contáctenos a través de nuestro 
+                        formulario de contacto o correo electrónico.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cambios en la Política -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Cambios en la Política</h2>
+                </div>
+                <div class="card-body">
+                    <p>Podemos actualizar esta política ocasionalmente. Los cambios 
+                       significativos serán notificados mediante:</p>
+                    <ul>
+                        <li>Aviso en nuestro sitio web</li>
+                        <li>Correo electrónico (para cambios importantes)</li>
+                        <li>Notificación en su cuenta</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Contacto -->
+            <div class="card">
+                <div class="card-body text-center">
+                    <h3 class="h5">¿Preguntas sobre privacidad?</h3>
+                    <p>Contáctenos para cualquier consulta sobre su privacidad</p>
+                    <a href="{% url 'storefront:contact' %}" class="btn btn-primary">
+                        <i class="fas fa-envelope me-2"></i>Contactar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
