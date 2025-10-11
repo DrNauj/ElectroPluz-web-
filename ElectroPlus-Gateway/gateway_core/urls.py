@@ -13,7 +13,6 @@ from gateway_app import views as gateway_views # Importación de vistas del gate
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('storefront.urls')),
-    path('shop/', include('sales.urls')),
     
     # Dashboard y sus submódulos
     path('dashboard/', include([

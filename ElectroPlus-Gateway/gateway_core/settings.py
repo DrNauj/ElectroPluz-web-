@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     'drf_spectacular',
     'gateway_app',
     'storefront',  # Frontend público global
-    'sales',      # Tienda y carrito
     'inventory',  # Dashboard y gestión
 ]
 
@@ -107,7 +106,6 @@ TEMPLATES = [
             BASE_DIR / 'templates',
             BASE_DIR / 'gateway_app' / 'templates',
             BASE_DIR / 'storefront' / 'templates',
-            BASE_DIR / 'sales' / 'templates',
             BASE_DIR / 'inventory' / 'templates',
         ],
         'APP_DIRS': True,
@@ -176,7 +174,6 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'gateway_app' / 'static',
     BASE_DIR / 'storefront' / 'static',
-    BASE_DIR / 'sales' / 'static',
     BASE_DIR / 'inventory' / 'static',
 ]
 

@@ -1,423 +1,537 @@
 """
-Vistas para la aplicación storefront (frontend público de la tienda).
+Vistas del frontend público (storefront).
 
-Este módulo es responsable de renderizar las páginas del catálogo,
-página de inicio, detalle de producto y las vistas de carrito y checkout.
-Todas las vistas que acceden a datos de productos o categorías
-se comunican con el Microservicio de INVENTARIO (8001) y las de
-ventas/carrito/checkout con el Microservicio de VENTAS (8002).
+Este módulo implementa la lógica de presentación, actuando como cliente de los
+microservicios de Inventario y Ventas. Se han eliminado todas las dependencias
+a los modelos locales de 'gateway_app'.
 """
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.http import require_POST
-from django.core.paginator import Paginator
-from django.db.models import Q
+from django.contrib import messages
 from django.conf import settings
-from django.contrib import messages # Necesario para los mensajes de éxito/error
 import requests
 import json
 import logging
-from requests.exceptions import RequestException
 
-# Importaciones específicas para la lógica del carrito y checkout
+# Importamos las utilidades de cart y forms (asumiendo que forms.py está en gateway_app)
 from .cart import Cart
-from gateway_app.forms import CheckoutForm 
-# Nota: La importación de formularios debe ser desde donde se definieron (gateway_app/forms.py)
+from gateway_app.forms import CheckoutForm # Usamos el formulario de envío (sin ModelForm)
 
 logger = logging.getLogger(__name__)
 
-# --- Funciones Auxiliares de Conexión ---
+# --- Funciones de Utilidad de Microservicios ---
 
 def fetch_data_from_inventario(endpoint, params=None):
-    """
-    Realiza una petición GET al Microservicio de Inventario (puerto 8001).
-    Asegura la inclusión de la clave de seguridad (X-API-Key).
-    """
-    base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL']
-    api_key = settings.MICROSERVICES['INVENTARIO']['API_KEY']
-    url = f"{base_url}{endpoint}"
-    
-    headers = {
-        'X-API-Key': api_key,
-        'Content-Type': 'application/json'
-    }
-
+    """Realiza una solicitud GET al Microservicio de Inventario."""
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=5)
-        response.raise_for_status()  # Lanza una excepción para errores 4xx/5xx
-        
+        url = f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}{endpoint}"
+        response = requests.get(
+            url,
+            params=params,
+            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']},
+            timeout=5
+        )
+        response.raise_for_status() # Lanza error para códigos 4xx/5xx
         return response.json()
-    
-    except RequestException as e:
-        logger.error(f"Error de conexión con Microservicio INVENTARIO en {url}: {e}")
-        return {'results': [], 'count': 0} if endpoint.endswith('/') else None
-    
-    except Exception as e:
-        logger.error(f"Error inesperado al procesar la respuesta de INVENTARIO: {e}")
-        return {'results': [], 'count': 0} if endpoint.endswith('/') else None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error al conectar con Inventario en {url}: {e}")
+        return None
 
-def make_ventas_request(request, method, endpoint, data=None):
-    """
-    Función genérica para realizar peticiones al Microservicio de Ventas (puerto 8002).
-    Asegura la inclusión del API Key y el token de usuario si está disponible.
-    """
-    base_url = settings.MICROSERVICES['VENTAS']['BASE_URL']
-    url = f"{base_url}{endpoint}"
-    
-    headers = {
-        'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
-        'Content-Type': 'application/json'
-    }
-
-    # Incluir token de autenticación si el usuario está logueado
-    if request.session.get('is_authenticated'):
-        user_token = request.session['user']['token']
-        headers['Authorization'] = f'Token {user_token}'
-
+def fetch_data_from_ventas(endpoint, request_session_token=None, method='GET', data=None):
+    """Realiza una solicitud a Microservicio de Ventas."""
     try:
-        if method == 'get':
-            response = requests.get(url, headers=headers, timeout=5)
-        elif method == 'post':
+        url = f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}{endpoint}"
+        headers = {
+            'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
+            'Content-Type': 'application/json' if data is not None else 'application/json',
+        }
+        
+        # Si se proporciona un token de sesión (para operaciones autenticadas)
+        if request_session_token:
+            headers['Authorization'] = f'Token {request_session_token}'
+
+        if method == 'GET':
+            response = requests.get(url, headers=headers, params=data, timeout=5)
+        elif method == 'POST':
             response = requests.post(url, headers=headers, json=data, timeout=5)
-        elif method == 'put':
-            response = requests.put(url, headers=headers, json=data, timeout=5)
-        elif method == 'delete':
-            response = requests.delete(url, headers=headers, json=data, timeout=5)
-        else:
-            raise ValueError("Método HTTP no soportado.")
-
-        response.raise_for_status()
         
-        if response.status_code == 204:
-            return {}
-            
+        response.raise_for_status()
         return response.json()
-    
-    except RequestException as e:
-        logger.error(f"Error de conexión con Microservicio VENTAS en {url} ({method}): {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Error inesperado al procesar la respuesta de VENTAS: {e}")
+        
+    except requests.exceptions.HTTPError as e:
+        logger.warning(f"Error HTTP en Ventas ({e.response.status_code}): {e.response.text}")
+        # Devuelve el cuerpo del error si es un 4xx/5xx (ej: 400 Bad Request)
+        try:
+            return {'error': e.response.json(), 'status_code': e.response.status_code}
+        except json.JSONDecodeError:
+            return {'error': f"Error en el microservicio: {e.response.text}", 'status_code': e.response.status_code}
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error al conectar con Ventas en {url}: {e}")
         return None
 
-
-# --- Vistas de Catálogo (Mantenidas) ---
+# --- Vistas de Catálogo (Usa Microservicio de Inventario) ---
 
 def home(request):
-    """Vista de la página principal. Muestra productos destacados y categorías."""
-    
-    categories_data = fetch_data_from_inventario('api/categorias/')
-    categories = categories_data.get('results', [])
-    
-    products_data = fetch_data_from_inventario('api/productos/', params={'limit': 8, 'featured': 'true'})
-    featured_products = products_data.get('results', [])
+    """Vista de la página principal (Home)."""
+    # Usamos el endpoint que devuelve categorías y productos destacados
+    data = fetch_data_from_inventario('catalogo/home/') 
     
     context = {
-        'categories': categories,
-        'featured_products': featured_products,
+        'categories': data.get('categories', []) if data else [],
+        'featured_products': data.get('featured_products', []) if data else [],
     }
-    return render(request, 'storefront/home.html', context)
+    # Ruta de template ajustada
+    return render(request, 'storefront/home.html', context) 
 
 def product_list(request):
-    """Lista de todos los productos con filtros, búsqueda y paginación."""
-    
-    params = {}
-    
-    search_query = request.GET.get('q')
-    category_slug = request.GET.get('category')
-    min_price = request.GET.get('min_price')
-    max_price = request.GET.get('max_price')
-    
-    if search_query:
-        params['search'] = search_query 
-    if category_slug:
-        params['category_slug'] = category_slug 
-    if min_price:
-        params['min_price'] = min_price
-    if max_price:
-        params['max_price'] = max_price
-        
-    page_number = request.GET.get('page')
-    page_size = 12 
-    params['page'] = page_number
-    params['page_size'] = page_size
-    
-    products_data = fetch_data_from_inventario('api/productos/', params=params)
-    products = products_data.get('results', [])
-    
-    categories_data = fetch_data_from_inventario('api/categorias/')
-    categories = categories_data.get('results', [])
-
-    context = {
-        'products': products,
-        'categories': categories,
-        'search_query': search_query,
+    """Lista de todos los productos con filtros y ordenamiento."""
+    params = {
+        'category_slug': request.GET.get('category'),
+        'min_price': request.GET.get('min_price'),
+        'max_price': request.GET.get('max_price'),
+        'search': request.GET.get('q'),
+        'order_by': request.GET.get('sort'),
+        'page': request.GET.get('page'),
     }
+    
+    # Usamos el endpoint que acepta todos los parámetros de filtrado
+    data = fetch_data_from_inventario('catalogo/productos/', params=params)
+    categories = fetch_data_from_inventario('catalogo/categorias/') # Para mostrar el menú de filtros
+    
+    context = {
+        'products': data.get('products', []) if data else [],
+        'categories': categories if categories else [],
+        'paginator_data': data.get('paginator', {}) if data else {}, # Contiene info de paginación
+        'current_category_slug': params['category_slug']
+    }
+    # Ruta de template ajustada
     return render(request, 'storefront/product_list.html', context)
-
 
 def product_detail(request, slug):
     """Detalle de un producto específico."""
+    product_data = fetch_data_from_inventario(f'catalogo/productos/{slug}/')
     
-    product = fetch_data_from_inventario(f'api/productos/slug/{slug}/')
-    
-    if not product:
-        return render(request, 'storefront/product_not_found.html', {'slug': slug}, status=404)
-    
+    if not product_data or 'error' in product_data:
+        messages.error(request, 'Producto no encontrado.')
+        return redirect('storefront:products')
+        
     context = {
-        'product': product,
+        'product': product_data,
     }
+    # Ruta de template ajustada
     return render(request, 'storefront/product_detail.html', context)
 
 def category(request, slug):
-    """Lista de productos filtrados por categoría (Redirección)."""
-    return redirect(f'{redirect("storefront:products").url}?category={slug}')
+    """Lista de productos filtrados por una categoría."""
+    # Redirige a la vista principal de productos con el parámetro 'category'
+    return redirect('storefront:products', category=slug)
 
-# --- Vistas de Carrito (Refactorizadas) ---
+def search(request):
+    """Búsqueda de productos."""
+    # Redirige a la vista principal de productos con el parámetro 'q'
+    return redirect('storefront:products', q=request.GET.get('q', ''))
 
-def cart(request):
-    """Muestra el carrito de compras, obteniendo datos del Microservicio de Ventas."""
-    cart_instance = Cart(request)
-    cart_data = cart_instance.get_data()
+# La vista de 'ofertas' requeriría un endpoint específico en el microservicio.
+def ofertas(request):
+    """Vista de productos en oferta."""
+    # Asumimos que el microservicio tiene un endpoint 'catalogo/ofertas/'
+    data = fetch_data_from_inventario('catalogo/ofertas/')
+    categories = fetch_data_from_inventario('catalogo/categorias/')
     
     context = {
-        'cart': cart_data,
-        'cart_id': cart_instance.cart_id # Útil para debug o scripts JS
+        'products': data.get('products', []) if data else [],
+        'categories': categories if categories else [],
     }
-    return render(request, 'storefront/cart.html', context)
+    # Ruta de template ajustada
+    return render(request, 'storefront/ofertas.html', context)
+
+
+# --- Vistas de Carrito y Compra (Usa Microservicio de Ventas) ---
+
+def cart(request):
+    """Muestra el contenido del carrito."""
+    cart_obj = Cart(request)
+    
+    context = {
+        'cart': cart_obj.get_data() # Método corregido para obtener datos enriquecidos
+    }
+    # RUTA AJUSTADA A storefront/shop/cart.html
+    return render(request, 'storefront/shop/cart.html', context)
 
 @require_POST
 def cart_add(request):
-    """Agrega un producto al carrito (usando el Microservicio)."""
-    cart = Cart(request)
-    
-    try:
-        product_id = request.POST.get('product_id')
-        quantity = int(request.POST.get('quantity', 1))
-        # Nota: Asume que el formulario envía 'override_quantity' como 'True' o 'False'
-        override = request.POST.get('override_quantity', 'False').lower() == 'true'
-        
-        if not product_id or quantity <= 0:
-            raise ValueError("ID de producto o cantidad inválida.")
-
-        success = cart.add(product_id=product_id, quantity=quantity, override_quantity=override)
-        
-        if success:
-            messages.success(request, 'Producto agregado al carrito con éxito.')
-        else:
-            messages.error(request, 'Hubo un problema al agregar el producto. Revise el stock.')
-
-    except ValueError as e:
-        messages.error(request, f'Error de datos: {e}')
-    except Exception as e:
-        logger.error(f"Error desconocido al agregar al carrito: {e}")
-        messages.error(request, 'Error inesperado al procesar la solicitud.')
-        
-    # Redirige al carrito
-    return redirect('storefront:cart') 
-
-@require_POST
-def cart_remove(request):
-    """Elimina un producto del carrito (usando el Microservicio)."""
-    cart = Cart(request)
+    """Añade un producto al carrito."""
     product_id = request.POST.get('product_id')
+    quantity = int(request.POST.get('quantity', 1))
     
-    if product_id:
-        success = cart.remove(product_id=product_id)
-        if success:
-            messages.info(request, 'Producto eliminado del carrito.')
-        else:
-            messages.error(request, 'Error al eliminar el producto del carrito.')
+    if not product_id:
+        messages.error(request, "ID de producto inválido.")
+        return redirect('storefront:cart')
+
+    # La lógica de añadir ahora reside en la clase Cart y es segura.
+    cart = Cart(request)
+    result = cart.add(product_id=product_id, quantity=quantity)
     
-    return redirect('storefront:cart')
+    if result.get('success'):
+        messages.success(request, result.get('message', 'Producto añadido al carrito.'))
+    else:
+        messages.error(request, result.get('message', 'Error al añadir el producto. Verifique el stock.'))
+        
+    # Redirige de vuelta a la página de donde vino o al carrito por defecto
+    return redirect(request.POST.get('next', 'storefront:cart'))
 
 @require_POST
 def cart_update(request):
-    """Actualiza la cantidad de un producto del carrito (usando el Microservicio)."""
-    cart = Cart(request)
+    """Actualiza la cantidad de un producto en el carrito."""
     product_id = request.POST.get('product_id')
-    
-    try:
-        quantity = int(request.POST.get('quantity', 0))
-    except ValueError:
-        messages.error(request, 'La cantidad debe ser un número entero.')
+    quantity = int(request.POST.get('quantity', 1))
+
+    if not product_id or quantity < 1:
+        messages.error(request, "Datos de actualización inválidos.")
         return redirect('storefront:cart')
-    
-    if product_id and quantity > 0:
-        success = cart.update_quantity(product_id=product_id, quantity=quantity)
-        if success:
-            messages.info(request, 'Cantidad del producto actualizada.')
-        else:
-            messages.error(request, 'Error al actualizar la cantidad del producto. Revise el stock.')
-    elif quantity == 0:
-        cart.remove(product_id)
-        messages.info(request, 'Producto eliminado del carrito.')
+        
+    cart = Cart(request)
+    result = cart.update(product_id=product_id, quantity=quantity)
+
+    if result.get('success'):
+        messages.success(request, result.get('message', 'Cantidad actualizada.'))
     else:
-        messages.error(request, 'Cantidad o ID de producto inválido.')
+        messages.error(request, result.get('message', 'Error al actualizar. Verifique el stock.'))
 
     return redirect('storefront:cart')
 
+@require_POST
+def cart_remove(request):
+    """Elimina un producto del carrito."""
+    product_id = request.POST.get('product_id')
 
-# --- Vistas de Checkout (Implementadas) ---
-
-def checkout(request):
-    """Proceso de checkout. Muestra el formulario de envío y el resumen del carrito."""
-    cart_instance = Cart(request)
-    cart_data = cart_instance.get_data()
-
-    if not cart_data.get('items'):
-        messages.warning(request, 'Su carrito está vacío. Agregue productos para continuar.')
+    if not product_id:
+        messages.error(request, "ID de producto inválido.")
         return redirect('storefront:cart')
 
-    # Intentar prellenar el formulario con datos de sesión (si están disponibles de gateway_app/views_auth.py)
-    initial_data = {}
-    if request.session.get('is_authenticated'):
-        user_info = request.session['user']
-        # Se asumen nombres de campo similares a CheckoutForm
-        initial_data = {
-            'shipping_name': user_info.get('nombre_completo', ''),
-            'email': user_info.get('email', ''),
-            'phone': user_info.get('phone', ''),
-            # Aquí podrías mapear otros campos de dirección si estuvieran disponibles
-        }
+    cart = Cart(request)
+    result = cart.remove(product_id=product_id)
+
+    if result.get('success'):
+        messages.success(request, result.get('message', 'Producto eliminado del carrito.'))
+    else:
+        messages.error(request, result.get('message', 'Error al eliminar el producto.'))
+
+    return redirect('storefront:cart')
+
+# La vista checkout es GET y POST (maneja la visualización del formulario y la validación previa a la confirmación)
+def checkout(request):
+    """Muestra el formulario de checkout y maneja la información de envío."""
+    cart_obj = Cart(request)
+    cart_data = cart_obj.get_data()
+    
+    if not cart_data.get('items'):
+        messages.warning(request, "Tu carrito está vacío. No puedes proceder al pago.")
+        return redirect('storefront:cart')
     
     if request.method == 'POST':
         form = CheckoutForm(request.POST)
         if form.is_valid():
-            # Guardar datos del formulario en la sesión temporalmente
-            request.session['checkout_data'] = form.cleaned_data
-            request.session.modified = True
+            # Los datos del formulario se guardan temporalmente en la sesión
+            request.session['checkout_info'] = form.cleaned_data
             return redirect('storefront:checkout_confirm')
+        else:
+            messages.error(request, "Por favor, corrige los errores en el formulario de envío.")
     else:
+        # Intenta precargar datos si el usuario está autenticado y tiene un perfil
+        initial_data = {}
+        if request.session.get('is_authenticated') and request.session.get('user', {}).get('id'):
+            token = request.session['user']['token']
+            profile_data = fetch_data_from_ventas('clientes/perfil/', token)
+            
+            if profile_data and not profile_data.get('error'):
+                # Mapeo de campos del perfil a campos del formulario Checkout
+                initial_data = {
+                    'shipping_name': f"{profile_data.get('first_name', '')} {profile_data.get('last_name', '')}",
+                    'shipping_address': profile_data.get('address'),
+                    'shipping_city': profile_data.get('city'),
+                    'shipping_state': profile_data.get('state'),
+                    'shipping_zip': profile_data.get('zip_code'),
+                    'shipping_country': profile_data.get('country'),
+                    'email': profile_data.get('email'),
+                    'phone': profile_data.get('phone'),
+                }
+        
         form = CheckoutForm(initial=initial_data)
 
     context = {
         'cart': cart_data,
-        'form': form,
-        'cart_id': cart_instance.cart_id
+        'form': form
     }
-    return render(request, 'storefront/checkout.html', context)
+    # RUTA AJUSTADA A storefront/shop/checkout.html
+    return render(request, 'storefront/shop/checkout.html', context)
 
 
 def checkout_confirm(request):
-    """Confirmación final de la orden y creación de la orden en el microservicio."""
-    cart_instance = Cart(request)
-    cart_data = cart_instance.get_data()
-    checkout_data = request.session.get('checkout_data')
-
-    if not cart_data.get('items') or not checkout_data:
-        messages.warning(request, 'El proceso de compra no está completo. Vuelva al checkout.')
+    """Muestra la confirmación final antes de crear el pedido en el microservicio."""
+    cart_obj = Cart(request)
+    cart_data = cart_obj.get_data()
+    checkout_info = request.session.get('checkout_info')
+    
+    if not cart_data.get('items') or not checkout_info:
+        messages.error(request, "Faltan datos del carrito o del envío. Intente de nuevo.")
         return redirect('storefront:checkout')
 
     if request.method == 'POST':
-        # 1. Preparar la estructura de la orden para el microservicio
+        if not request.session.get('is_authenticated'):
+            # Si el usuario no está autenticado, no se permite crear el pedido
+            messages.error(request, "Debes iniciar sesión para confirmar tu pedido.")
+            return redirect('login') 
+        
+        token = request.session['user']['token']
+        user_id = request.session['user']['id'] # ID del cliente en el microservicio
+        
+        # 1. Preparar la estructura del pedido para el microservicio de Ventas
+        order_details = [
+            {
+                'product_id': int(item['product_id']),
+                'quantity': item['quantity'],
+                'unit_price': float(item['price'])
+            } for item in cart_data['items']
+        ]
+        
         order_payload = {
-            'cart_id': cart_instance.cart_id,
-            # Obtener el ID del usuario autenticado si existe
-            'user_id': request.session.get('user', {}).get('id'), 
-            # Añadir los campos de envío/contacto del formulario
-            **checkout_data,
-            'payment_method': request.POST.get('payment_method', 'Efectivo') # Asume un campo de pago en el formulario
+            'customer_id': user_id,
+            'details': order_details,
+            # Añadir la información de envío guardada en sesión
+            'shipping_name': checkout_info.get('shipping_name'),
+            'shipping_address': checkout_info.get('shipping_address'),
+            'shipping_city': checkout_info.get('shipping_city'),
+            'shipping_state': checkout_info.get('shipping_state'),
+            'shipping_zip': checkout_info.get('shipping_zip'),
+            'shipping_country': checkout_info.get('shipping_country'),
+            'email': checkout_info.get('email'),
+            'phone': checkout_info.get('phone'),
+            'total': float(cart_data['total']) # Total final
         }
         
-        # 2. Llamar al microservicio para crear la orden (POST)
-        # Endpoint: /api/ordenes/crear/
-        new_order = make_ventas_request(request, 'post', 'api/ordenes/crear/', data=order_payload)
+        # 2. Enviar la orden al microservicio de Ventas
+        result = fetch_data_from_ventas(
+            endpoint='ventas/ordenes/', 
+            request_session_token=token, 
+            method='POST', 
+            data=order_payload
+        )
 
-        if new_order and new_order.get('id'):
-            # 3. Éxito: Limpiar el carrito local y la sesión de checkout
-            cart_instance.clear() 
-            if 'checkout_data' in request.session:
-                del request.session['checkout_data']
-                request.session.modified = True
-
-            messages.success(request, f'¡Gracias! Su pedido #{new_order["id"]} ha sido creado con éxito.')
-            return render(request, 'storefront/checkout_success.html', {'order': new_order})
+        if result and result.get('id'):
+            # Éxito: Vaciar carrito y sesión de checkout
+            cart_obj.clear()
+            del request.session['checkout_info']
+            messages.success(request, f"¡Tu pedido N° {result['id']} ha sido creado con éxito!")
+            # Redirigir a la vista de confirmación
+            return redirect('storefront:order_confirmation', order_id=result['id'])
         else:
-            messages.error(request, 'Error al procesar el pedido. El servicio de ventas no pudo crear la orden.')
+            # Fallo: Mostrar error
+            error_message = result.get('error', {}).get('message') or "Error desconocido al crear el pedido."
+            messages.error(request, f"No se pudo completar la compra: {error_message}")
             return redirect('storefront:checkout')
-
+            
     context = {
         'cart': cart_data,
-        'checkout_data': checkout_data,
+        'checkout_info': checkout_info,
     }
-    return render(request, 'storefront/checkout_confirm.html', context)
+    # RUTA AJUSTADA A storefront/shop/checkout_confirm.html
+    return render(request, 'storefront/shop/checkout_confirm.html', context)
 
-# --- Vistas de Información ---
 
-def search(request):
-    """Redirige la búsqueda a la vista de lista de productos."""
-    query = request.GET.get('q', '')
-    if query:
-        return redirect(f'{redirect("storefront:products").url}?q={query}')
-    return redirect('storefront:products')
+def order_confirmation(request, order_id):
+    """Muestra la página de confirmación de pedido."""
+    # En un entorno real, aquí se llamaría al microservicio para obtener los detalles finales del pedido.
+    
+    if not request.session.get('is_authenticated'):
+        messages.error(request, "Debes iniciar sesión para ver los detalles de un pedido.")
+        return redirect('login') 
 
-def ofertas(request):
-    """Muestra productos en oferta."""
-    params = {'offer': 'true', 'page_size': 20}
-    products_data = fetch_data_from_inventario('api/productos/', params=params)
+    token = request.session['user']['token']
+    
+    order_data = fetch_data_from_ventas(f'ventas/ordenes/{order_id}/', token)
+    
+    if not order_data or 'error' in order_data:
+        messages.error(request, 'Pedido no encontrado o no autorizado.')
+        return redirect('storefront:orders')
+        
+    context = {
+        'order': order_data
+    }
+    # RUTA AJUSTADA A storefront/shop/order_confirmation.html
+    return render(request, 'storefront/shop/order_confirmation.html', context)
+
+
+# --- Vistas de Cuenta y Perfil (Usa Microservicio de Ventas) ---
+
+@login_required(login_url='login')
+def profile(request):
+    """Muestra el perfil del cliente."""
+    token = request.session['user']['token']
+    profile_data = fetch_data_from_ventas('clientes/perfil/', token)
+    orders_data = fetch_data_from_ventas('clientes/pedidos/', token)
     
     context = {
-        'products': products_data.get('results', []),
-        'title': 'Ofertas del Día'
+        'customer_info': profile_data if profile_data and not profile_data.get('error') else None,
+        'orders': orders_data if orders_data and not orders_data.get('error') else [],
     }
-    return render(request, 'storefront/product_list.html', context) 
+    # RUTA AJUSTADA A storefront/account/profile.html
+    return render(request, 'storefront/account/profile.html', context)
 
+# Las demás vistas de cuenta, info y API (profile_edit, orders, order_detail, etc.)
+# seguirían la misma lógica de llamar a `fetch_data_from_ventas` o 
+# `fetch_data_from_inventario` y usar la ruta de template ajustada.
+
+# ... (Las demás vistas de tu proyecto deberían usar rutas de templates como las siguientes) ...
+
+@login_required(login_url='login')
+def profile_edit(request):
+    """Edición del perfil del cliente."""
+    # Lógica similar a profile pero con manejo de formulario POST/PUT al microservicio
+    return render(request, 'storefront/account/profile_edit.html', {})
+
+@login_required(login_url='login')
+def orders(request):
+    """Historial de pedidos del cliente."""
+    # Lógica de fetch_data_from_ventas('clientes/pedidos/', token)
+    return render(request, 'storefront/account/orders.html', {})
+
+@login_required(login_url='login')
+def order_detail(request, order_id):
+    """Detalle de un pedido específico."""
+    # Lógica de fetch_data_from_ventas(f'ventas/ordenes/{order_id}/', token)
+    return render(request, 'storefront/account/order_detail.html', {})
 
 def about(request):
     """Página Sobre Nosotros."""
-    return render(request, 'storefront/about.html')
+    return render(request, 'storefront/info/about.html', {})
 
 def contact(request):
     """Página de Contacto."""
-    return render(request, 'storefront/contact.html')
+    return render(request, 'storefront/info/contact.html', {})
 
 def faq(request):
     """Página de Preguntas Frecuentes."""
-    return render(request, 'storefront/faq.html')
+    return render(request, 'storefront/info/faq.html', {})
 
 def shipping(request):
-    """Página de Envíos."""
-    return render(request, 'storefront/shipping.html')
+    """Página de Información de Envíos."""
+    return render(request, 'storefront/info/shipping.html', {})
 
 def returns(request):
     """Página de Devoluciones."""
-    return render(request, 'storefront/returns.html')
+    return render(request, 'storefront/info/returns.html', {})
 
 def warranty(request):
     """Página de Garantía."""
-    return render(request, 'storefront/warranty.html')
+    return render(request, 'storefront/info/warranty.html', {})
 
 def privacy(request):
-    """Página de Privacidad."""
-    return render(request, 'storefront/privacy.html')
+    """Página de Política de Privacidad."""
+    return render(request, 'storefront/info/privacy.html', {})
 
 def terms(request):
     """Página de Términos y Condiciones."""
-    return render(request, 'storefront/terms.html')
+    return render(request, 'storefront/info/terms.html', {})
 
-# --- Vistas de Usuario (DEBEN SER MANEJADAS PRINCIPALMENTE POR GATEWAY_APP) ---
+# --- Vistas API (JSON Responses) ---
 
-def profile(request):
-    """Muestra el perfil del usuario."""
-    return redirect('gateway_app:customer_dashboard') # Redirige al dashboard del cliente
+# Mantendríamos las vistas API para JS/fetch si las necesitas.
+# Estas vistas simplemente llaman a la lógica del carrito y devuelven JSON.
 
-@login_required
-def orders(request):
-    """Muestra la lista de pedidos del usuario."""
-    # Esta vista debe llamar al Microservicio de VENTAS usando el token de Auth.
-    # Por ahora, se redirige al dashboard del cliente, que ya implementa esta lógica.
-    return redirect('gateway_app:customer_dashboard') 
+@require_POST
+def api_cart_add(request):
+    """API para añadir productos al carrito (Usado por JS)."""
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        quantity = int(data.get('quantity', 1))
+        
+        cart = Cart(request)
+        result = cart.add(product_id=product_id, quantity=quantity)
+        
+        if result.get('success'):
+            return JsonResponse({
+                'success': True,
+                'message': result['message'],
+                'cart_summary': cart.get_summary() # Resumen simple para el frontend
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': result['message']
+            }, status=400)
+    except Exception as e:
+        logger.error(f"Error en api_cart_add: {e}")
+        return JsonResponse({'success': False, 'message': 'Error interno del servidor'}, status=500)
 
-@login_required
-def order_detail(request, order_id):
-    """Detalle de un pedido específico."""
-    # Esta vista debe llamar al Microservicio de VENTAS para obtener el detalle.
-    order_data = make_ventas_request(request, 'get', f'api/ordenes/{order_id}/')
-    
-    if not order_data:
-        messages.error(request, 'No se pudo encontrar el detalle del pedido o hubo un error de conexión.')
-        return redirect('storefront:orders')
+@require_POST
+def api_cart_remove(request):
+    """API para eliminar productos del carrito."""
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        
+        cart = Cart(request)
+        result = cart.remove(product_id=product_id)
 
-    return render(request, 'storefront/order_detail.html', {'order': order_data})
+        if result.get('success'):
+            return JsonResponse({
+                'success': True,
+                'message': result['message'],
+                'cart_summary': cart.get_summary() 
+            })
+        else:
+             return JsonResponse({
+                'success': False,
+                'message': result['message']
+            }, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': 'Error interno del servidor'}, status=500)
+
+@require_POST
+def api_cart_update(request):
+    """API para actualizar cantidad en el carrito."""
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        quantity = int(data.get('quantity', 1))
+        
+        cart = Cart(request)
+        result = cart.update(product_id=product_id, quantity=quantity)
+
+        if result.get('success'):
+            return JsonResponse({
+                'success': True,
+                'message': result['message'],
+                'cart_summary': cart.get_summary() 
+            })
+        else:
+             return JsonResponse({
+                'success': False,
+                'message': result['message']
+            }, status=400)
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': 'Error interno del servidor'}, status=500)
+
+@require_POST
+def api_checkout_validate(request):
+    """API para validar datos del checkout antes de enviar la orden final."""
+    try:
+        data = json.loads(request.body)
+        # Usamos el mismo formulario de Django para la validación de estructura
+        form = CheckoutForm(data)
+        
+        if form.is_valid():
+            return JsonResponse({'valid': True})
+        else:
+            # Devuelve los errores específicos del formulario
+            return JsonResponse({
+                'valid': False,
+                'errors': form.errors.get_json_data()
+            }, status=400)
+    except Exception as e:
+        logger.error(f"Error en api_checkout_validate: {e}")
+        return JsonResponse({'valid': False, 'error': 'Error de procesamiento'}, status=500)

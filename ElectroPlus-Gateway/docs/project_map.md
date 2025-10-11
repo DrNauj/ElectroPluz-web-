@@ -27,6 +27,102 @@ Objetivo: documento que mapea archivos importantes del proyecto, sus conexiones 
   - Autenticación: Centralizada en gateway_app, delegación a microservicios
   - Carrito: Duplicación entre storefront/sales pendiente de resolver
 
+  ---
+
+  ## Resultado del reescaneo (automatic)
+
+  He realizado un reescaneo del código (urls.py y views.py principales) y de la carpeta de plantillas para verificar qué vistas renderizan qué plantillas y si esas plantillas existen en el repositorio. Abajo están los hallazgos por app, con la ruta de la vista, plantilla referenciada, y estado "Exists" o "Missing".
+
+  Nota: el reescaneo usó búsquedas en los archivos:
+  - `storefront/views.py`, `storefront/urls.py`
+  - `sales/views.py`, `sales/urls.py`
+  - `inventory/views.py`, `inventory/urls.py`
+  - `gateway_app/views.py`, `gateway_app/urls.py`
+  - `gateway_core/urls.py`
+
+  ### App: storefront
+
+  | URL | Vista | Template referenciada | Estado |
+  |---|---|---|---|
+  | `/` | `storefront.views.home` | `storefront/home.html` | Exists (`storefront/templates/storefront/home.html`) |
+  | `/productos/` | `storefront.views.product_list` | `storefront/product_list.html` | Missing (no hay `storefront/product_list.html`, el template de listado aparece bajo `storefront/shop/` en algunos casos) |
+  | `/producto/<slug>/` | `storefront.views.product_detail` | `storefront/product_detail.html` | Exists? (`storefront/templates/storefront/shop/product_detail.html` exists) — mismatch con la ruta esperada por la vista |
+  | `/ofertas/` | `storefront.views.ofertas` | `storefront/ofertas.html` | Missing (no `storefront/ofertas.html` en templates; hay `storefront/shop/` para shop templates) |
+  | `/carrito/` | `storefront.views.cart` | `storefront/shop/cart.html` | Exists (`storefront/templates/storefront/shop/cart.html`) |
+  | `/checkout/` | `storefront.views.checkout` | `storefront/shop/checkout.html` | Exists (`storefront/templates/storefront/shop/checkout.html`) |
+  | `/checkout/confirmar/` | `storefront.views.checkout_confirm` | `storefront/shop/checkout_confirm.html` | Exists (`storefront/templates/storefront/shop/checkout_confirm.html`) |
+  | `/pedido/<order_id>/` | `storefront.views.order_confirmation` | `storefront/shop/order_confirmation.html` | Exists (`storefront/templates/storefront/shop/order_confirmation.html`) |
+  | `/perfil/` | `storefront.views.profile` | `storefront/account/profile.html` | Missing (no `storefront/account/profile.html` encontrado) |
+  | `/perfil/editar/` | `storefront.views.profile_edit` | `storefront/account/profile_edit.html` | Missing |
+  | `/pedidos/` | `storefront.views.orders` | `storefront/account/orders.html` | Missing |
+  | `/pedido/<order_id>/` | `storefront.views.order_detail` | `storefront/account/order_detail.html` | Missing |
+  | `/sobre-nosotros/` | `storefront.views.about` | `storefront/info/about.html` | Missing (no `storefront/info/about.html`) |
+  | `/contacto/` | `storefront.views.contact` | `storefront/info/contact.html` | Missing |
+  | `/faq/` | `storefront.views.faq` | `storefront/info/faq.html` | Missing |
+  | `/envios/` | `storefront.views.shipping` | `storefront/info/shipping.html` | Missing |
+  | `/devoluciones/` | `storefront.views.returns` | `storefront/info/returns.html` | Missing |
+  | `/garantia/` | `storefront.views.warranty` | `storefront/info/warranty.html` | Missing |
+  | `/privacidad/` | `storefront.views.privacy` | `storefront/info/privacy.html` | Missing |
+  | `/terminos/` | `storefront.views.terms` | `storefront/info/terms.html` | Missing |
+  | `/api/cart/add/` etc. | `storefront.views.api_cart_*` | API (JSON) | Implemented (views present) |
+
+  Observación: varias vistas en `storefront.views` referencian plantillas en `storefront/...` mientras que muchos templates de shop están organizados bajo `storefront/templates/storefront/shop/`. Esto causa mismatch en las rutas esperadas por las vistas.
+
+  ### App: sales
+
+  | URL | Vista | Template referenciada | Estado |
+  |---|---|---|---|
+  | `/shop/` | `sales.views.shop_home` | `sales/shop_home.html` | Missing (no `sales/shop_home.html` detectado en templates) |
+  | `/shop/cart/` | `sales.views.cart_view` | `sales/cart.html` | Exists (`sales/templates/sales/cart.html`) |
+  | `/shop/checkout/` | `sales.views.checkout` | `sales/checkout.html` | Exists (`sales/templates/sales/checkout.html`) |
+  | `/shop/order/confirmation/<order_number>/` | `sales.views.order_confirmation` | `sales/order_confirmation.html` | Exists (`sales/templates/sales/order_confirmation.html`) |
+  | `/shop/api/cart/...` | `sales.views.cart_add` etc. | API (JSON) | Implemented (vistas presentes) |
+
+  Observación: `sales` contiene una implementación completa de carrito y checkout que solapa funcionalmente con `storefront`.
+
+  ### App: inventory
+
+  | URL | Vista | Template referenciada | Estado |
+  |---|---|---|---|
+  | `/dashboard/` | `inventory.views.dashboard_home` | `inventory/dashboard/admin_dashboard.html` | Exists (`inventory/templates/inventory/dashboard/admin_dashboard.html`) |
+  | `/dashboard/products/` | `inventory.views.product_management` | `inventory/product_management.html` | Exists (`inventory/templates/inventory/product_management.html`) |
+  | `/dashboard/orders/` | `inventory.views.order_list` | `inventory/orders_list.html` | Exists (`inventory/templates/inventory/orders_list.html` or dashboard variants`) |
+
+  Observación: El dashboard de `inventory` está consistente en vistas y plantillas.
+
+  ### App: gateway_app
+
+  | URL | Vista | Template referenciada | Estado |
+  |---|---|---|---|
+  | `/auth/login/` | `gateway_app.views.login` | `auth/login.html` | Missing en repo (no `storefront/templates/auth/login.html` detectado) |
+  | `/auth/register/` | `gateway_app.views.register` | `auth/register.html` | Missing |
+  | `/auth/api/login/` | `gateway_app.views.login_api` | API | Implemented |
+  | `/dashboard/` | `gateway_app.views.dashboard` | `dashboard/*` | Mixed: vistas renderizan `dashboard/customer_dashboard.html`, `dashboard/admin_dashboard.html` — buscar plantillas en `storefront/templates/dashboard/` o `templates/dashboard/` |
+
+  Observación: Algunas plantillas de autenticación y dashboard parecen no estar en las ubicaciones estándar; es necesario confirmar si están bajo `storefront/templates/auth/` o en otro lugar.
+
+  ## Recomendaciones rápidas (prioritizadas)
+
+  - P0: Resolver duplicación del carrito.
+    - Opciones: consolidar la lógica de carrito en `storefront` (como servicio reutilizable) y actualizar `sales` para consumir esa API; o elegir `sales` como source-of-truth y actualizar vistas de `storefront` para delegar.
+
+  - P0: Unificar convención de templates.
+    - Hay una mezcla entre vistas que esperan `storefront/<name>.html` y plantillas físicas en `storefront/shop/<name>.html`. Recomiendo mover los templates `shop/*` a `storefront/` si no hay conflictos de nombres, o actualizar las vistas para usar `storefront/shop/<name>.html` consistentemente.
+
+  - P1: Añadir placeholders para las plantillas de `storefront/account/*` y `storefront/info/*` (si no quieres crearlas manualmente ahora) para evitar errores en tiempo de ejecución.
+
+  - P1: Confirmar presencia de plantillas de `auth/` y `dashboard/` y moverlas a `templates/auth/` y `templates/dashboard/` si es necesario.
+
+  ## Acciones que puedo ejecutar ahora (elige una):
+
+  1. Mover automáticamente `storefront/templates/storefront/shop/*` a `storefront/templates/storefront/` (si estás de acuerdo). Esto resolverá la mayoría de mismatches.
+  2. Actualizar vistas para apuntar a `storefront/shop/*` (menos disruptivo en filesystem).
+  3. Crear placeholders mínimos para las plantillas faltantes (`account/*`, `info/*`, `auth/*`) para que el servidor no falle en desarrollo.
+  4. Generar CSV con la lista completa de rutas y estados (para revisión fuera del repositorio).
+
+  Indica la opción que prefieres y la ejecutaré. Si quieres que haga los cambios automáticamente, lo haré en un commit pequeño y luego correré un check rápido (python manage.py check) para validar.
+
+
 ---
 
 ## Decisiones de templates (11/Oct/2025)
