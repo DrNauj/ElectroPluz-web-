@@ -22,10 +22,10 @@ def _call_inventario_service(endpoint, params=None):
     Llama al microservicio de Inventario y devuelve los datos JSON.
     Centraliza el manejo de errores HTTP y de conexión.
     """
-    base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL']
+    base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL'].rstrip('/')
     api_key = settings.MICROSERVICES['INVENTARIO']['API_KEY']
-    # Asumimos que los endpoints de Inventario tienen el prefijo 'catalogo/'
-    url = f"{base_url}catalogo/{endpoint}"
+    # Usar el endpoint directamente sin prefijo 'catalogo/'
+    url = f"{base_url}/{endpoint}"
     
     headers = {
         'X-API-Key': api_key,
@@ -84,6 +84,8 @@ def product_list(request):
         'max_price': request.GET.get('max_price'),
         'search': request.GET.get('search'), # Soporte para búsqueda
         'order_by': request.GET.get('sort_by'),
+        'on_sale': request.GET.get('on_sale'),  # Filtro de ofertas
+        'ordenar': request.GET.get('ordenar'),  # Campo de ordenamiento personalizado
     }
     
     # Limpiar parámetros vacíos
@@ -156,10 +158,11 @@ def search(request):
 
 def ofertas(request):
     """Vista de ofertas (productos con descuento). Obtiene data de Inventario."""
-    # Asumimos que la API de Inventario tiene un filtro para ofertas/descuentos
-    params = {'on_sale': 'true'}
-    # Llama al microservicio de Inventario (se reutiliza la lógica de product_list)
-    return product_list(request) # product_list manejará el filtro si se añade el parámetro
+    # Añadimos los parámetros de ofertas al request
+    request.GET = request.GET.copy()
+    request.GET['on_sale'] = 'true'
+    request.GET['ordenar'] = 'descuento' # Ordenar por mayor descuento primero
+    return product_list(request)
 
 # --- Vistas de Carrito (Usan sesiones locales, no tocan API aún) ---
 # Estas vistas DEBERÍAN actualizarse para sincronizar el carrito de sesión con un
