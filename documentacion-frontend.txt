@@ -1,0 +1,143 @@
+﻿📚 Documentación: Reestructuración del Frontend en Django
+Este documento detalla la estrategia de tres Apps (storefront, sales, inventory) para organizar el HTML (Plantillas), CSS y JavaScript, garantizando que los archivos estáticos carguen correctamente y la lógica esté separada por responsabilidades.
+I. Configuración y Fundamentos (settings.py)
+Antes de empezar, debemos asegurarnos de que Django sepa dónde buscar tus archivos estáticos y que sepa usar la etiqueta {% static %}.
+1. Revisa settings.py
+Verifica que tu archivo settings.py contenga las siguientes líneas (o equivalentes, si usas variables de entorno para producción):
+# settings.py
+
+# 1. Asegúrate de que StaticFiles es una App instalada
+INSTALLED_APPS = [
+   # ... otras apps
+   'django.contrib.staticfiles', 
+   'storefront',  # Nueva App central
+   'sales',      # App de la tienda pública
+   'inventory',  # App del dashboard de inventario
+]
+
+# 2. Define la URL base para archivos estáticos (ej: /static/)
+STATIC_URL = '/static/'
+
+# 3. Define directorios ADICIONALES para buscar archivos estáticos durante el desarrollo (opcional)
+# Si guardas archivos estáticos globales en la raíz del proyecto.
+# STATICFILES_DIRS = [
+#     BASE_DIR / 'static',
+# ]
+
+2. Regla de Oro: Usa {% load static %}
+Siempre debes comenzar tus plantillas con {% load static %} y usar la etiqueta {% static 'ruta/archivo' %} para referenciar cualquier CSS, JS o imagen.
+❌ Mal: <link href="/css/styles.css">
+✅ Bien: <link href="{% static 'storefront/css/global.css' %}">
+II. Estructura de Carpetas
+La mejor forma de cargar archivos sin conflicto es ubicar la carpeta static/ dentro de cada App. Esto permite que Django, al usar {% static %}, diferencie automáticamente los archivos de cada módulo.
+Ubicación
+	Contenido Esperado
+	Propósito
+	storefront/static/storefront/...
+	Archivos Globales: CSS para navbars, footers, base.html, y JS para menús.
+	El diseño y lógica común a toda la web.
+	sales/static/sales/...
+	Archivos de Cliente: CSS del catálogo, JS del carrito, JS de la galería de productos.
+	La experiencia del usuario final (e-commerce).
+	inventory/static/inventory/...
+	Archivos de Empleado: CSS del sidebar del dashboard, JS de gráficos, JS de formularios de gestión de inventario.
+	El sistema de administración interno.
+	III. Herencia de Plantillas y Bloques
+Utiliza la herencia para reducir la duplicación de código HTML y garantizar que el CSS/JS específico de cada vista cargue en el lugar correcto.
+Plantilla Base
+	Propósito
+	Bloques a Definir
+	storefront/templates/base.html
+	Esqueleto de la web pública.
+	{% block head_styles %}: CSS adicional.
+{% block content %}: Contenido principal.
+{% block footer_scripts %}: JS específico de la vista.
+	inventory/templates/inventory/base_dashboard.html
+	Esqueleto del área de administración (con sidebar).
+	{% block dashboard_styles %}: CSS del panel.
+{% block dashboard_content %}: Contenido del widget.
+{% block dashboard_scripts %}: JS del panel.
+	IV. Gestión de Vistas y Separación de Roles
+La lógica de visualización y acceso se maneja en las vistas de Django, usando el sistema de autenticación para separar la experiencia de cliente y empleado.
+1. Vistas y Plantillas por App
+App
+	Vistas Clave
+	Protección
+	Plantillas a Renderizar
+	sales (Cliente)
+	home, product_list, cart, checkout
+	Pública (o login_required para checkout)
+	Extienden storefront/base.html
+	inventory (Empleado)
+	dashboard_home, product_management, order_list
+	@login_required y @user_passes_test(lambda u: u.is_staff)
+	Extienden inventory/base_dashboard.html
+	2. Redirección Post-Login
+Modifica el comportamiento del login para redirigir según el rol del usuario:
+* Si es Empleado (user.is_staff es True): Redirigir a /inventory/.
+* Si es Cliente: Redirigir a / o a la página de perfil del cliente.
+V. Comunicación con el Backend (Django)
+Utiliza diferentes métodos para la comunicación, siempre priorizando la seguridad.
+A. Comunicación Sincrónica (Formularios POST)
+* Regla: Incluye {% csrf_token %} dentro de la etiqueta <form> para evitar errores 403 (CSRF).
+B. Comunicación Asincrónica (AJAX/Fetch)
+* Regla: Para peticiones POST, PUT, o DELETE mediante JavaScript, debes obtener el token CSRF de la cookie y enviarlo en el encabezado X-CSRFToken.
+Ejemplo de Petición Fetch (En JavaScript):
+// Asegúrate de tener la función getCookie('csrftoken') disponible
+const csrftoken = getCookie('csrftoken'); 
+
+fetch('/sales/api/cart/add/', { 
+   method: 'POST',
+   headers: {
+       'Content-Type': 'application/json',
+       'X-CSRFToken': csrftoken // Envío del token en el header
+   },
+   body: JSON.stringify({ /* datos de la solicitud */ })
+})
+// ...
+
+C. Estrategia de Backend para APIs
+Se recomienda utilizar Django REST Framework (DRF) para todas las operaciones asincrónicas.
+* sales/api/: Endpoints para operaciones de la tienda (Carrito, Búsqueda, etc.).
+* inventory/api/: Endpoints para la gestión de inventario y datos del dashboard.
+VI. Correcciones Arquitectónicas Adicionales (Backend)
+Una vez que el frontend esté estructurado, estos puntos corregirán la "desorganización" en la lógica del backend:
+1. Centralización de Modelos y Lógica
+Asegúrate de que la definición de datos y la lógica de negocio vivan en las Apps correctas:
+* App sales (Modelos): Product, Category, Order, OrderItem, CustomerProfile.
+* App inventory (Modelos): InventoryRecord (Stock real y movimientos), Supplier.
+2. Limpieza de URLs
+El archivo urls.py de tu proyecto principal (ElectroPluz/urls.py) debe ser solo un índice. Mueve todas las rutas específicas a sus respectivas Apps.
+Proyecto urls.py (Ejemplo):
+# ElectroPluz/urls.py
+from django.urls import path, include
+
+urlpatterns = [
+   path('admin/', admin.site.urls),
+   path('', include('storefront.urls')), # Home, Login, Global
+   path('shop/', include('sales.urls')), # Catalogo, Carrito, Checkout
+   path('inventory/', include('inventory.urls')), # Dashboard y gestion
+]
+
+3. Evitar Lógica Compleja en Vistas (Views)
+Las Vistas deben ser lo más delgadas posible: solo reciben la solicitud, llaman a la lógica de negocio y devuelven la respuesta.
+❌ Mal: Calcular impuestos y validar stock dentro de la función add_to_cart_view en views.py.
+✅ Bien: Definir un Manager o Service (ej. sales/managers.py) para manejar esa lógica.
+# sales/managers.py
+
+class CartManager:
+   def add_item(self, user, product_id, quantity):
+       # 1. Lógica de Negocio: Validar stock, calcular precio
+       # 2. Actualizar la base de datos (Modelos)
+       # 3. Retornar el resultado
+       pass
+   # ... otras funciones (calcular total, aplicar descuento)
+
+# sales/views.py (Vista delgada)
+def add_to_cart_view(request):
+   # Lógica mínima: 
+   # 1. Obtener datos (request.POST)
+   # 2. Llamar al Manager
+   CartManager().add_item(...)
+   # 3. Retornar respuesta
+   pass
