@@ -1,24 +1,26 @@
 """
 URL configuration for gateway_core project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/5.2/topics/http/urls/
 """
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from gateway_app import views as gateway_views # Importación de vistas del gateway
+from gateway_app import views as gateway_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('storefront.urls')),
+    
+    # Rutas públicas de la tienda (incluye catálogo, carrito, checkout, etc.)
+    path('', include('storefront.urls')), 
     
     # Dashboard y sus submódulos
-    path('dashboard/', include([
-        path('', gateway_views.dashboard, name='dashboard'),  # Vista principal del dashboard
+    # CRÍTICO: Se añade el namespace 'dashboard' aquí para que las redirecciones funcionen (e.g., redirect('dashboard:inventory:list_products'))
+    path('dashboard/', include(([
+        path('', gateway_views.dashboard, name='dashboard'),  # Vista principal del dashboard (inventario/ventas)
         path('inventory/', include('inventory.urls')),  # Submódulos del inventario
-    ])),
+    ], 'dashboard'), namespace='dashboard')), 
     
-    path('auth/', include('gateway_app.urls')),  # Para autenticación y funcionalidades base
+    # Rutas de autenticación (login, register, logout, APIs, customer-dashboard)
+    path('auth/', include('gateway_app.urls')),
+    
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

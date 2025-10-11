@@ -1,25 +1,22 @@
 from django.urls import path
-from . import views # ¡Importación corregida! Ahora apunta a views.py
+# CRÍTICO: Importar el módulo de vistas unificado
+from . import views 
 
-app_name = 'gateway_app'
+app_name = 'auth'
 
 urlpatterns = [
-    # ----------------------------------------------------
-    # --- Vistas Web (URLs para renderizar páginas) ---
-    # ----------------------------------------------------
-    path('login/', views.login, name='login'),
-    path('register/', views.register, name='register'),
-    path('logout/', views.logout_view, name='logout'),
-    
-    # Rutas de perfil (mantienen prefijo auth/ por ser parte de la gestión de usuarios)
-    path('profile/edit/customer/', views.customer_profile_edit, name='customer_profile_edit'),
-    path('profile/edit/admin/', views.admin_profile_edit, name='admin_profile_edit'),
-
-    # ----------------------------------------------------
-    # --- Vistas API (Para uso interno de AJAX/Frontend) ---
-    # ----------------------------------------------------
+    # Autenticación via API (Usados por JS)
     path('api/login/', views.login_api, name='login_api'),
     path('api/logout/', views.logout_api, name='logout_api'),
     path('api/register/', views.register_api, name='register_api'),
-    path('api/check-auth/', views.check_auth, name='check_auth'),
+    # Nota: la función check_auth se renombra a check_auth_api en views.py para consistencia
+    path('api/check-auth/', views.check_auth_api, name='check_auth'), 
+
+    # Vistas de autenticación (Frontend con formularios)
+    path('login/', views.login_view, name='login'),
+    path('register/', views.register_view, name='register'),
+    path('logout/', views.logout_view, name='logout'),
+    
+    # Vista del Dashboard del Cliente
+    path('customer-dashboard/', views.customer_dashboard, name='customer_dashboard'),
 ]
