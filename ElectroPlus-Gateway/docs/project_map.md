@@ -1,8 +1,8 @@
 # Mapa del proyecto ElectroPlus (Gateway)
 
-Fecha: 11 de octubre de 2025 (Actualizado)
+Fecha: 11 de octubre de 2025 (Actualización Post-Reestructuración)
 
-Objetivo: documento que mapea archivos importantes del proyecto, sus conexiones (URLs/vistas/templates/static), gaps (rutas o includes faltantes) y recomendaciones para arreglar el front-end.
+Objetivo: Documento que mapea el estado actual del proyecto después de la reestructuración, sus conexiones (URLs/vistas/templates/static), y próximos pasos de mejora.
 
 ---
 

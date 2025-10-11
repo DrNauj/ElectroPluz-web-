@@ -3,6 +3,23 @@
 
 $ErrorActionPreference = "Stop"
 
+# Función para limpiar procesos existentes en puertos
+function Clear-UsedPorts {
+    param(
+        [int[]]$ports
+    )
+    Write-Host "Verificando y limpiando puertos en uso..." -ForegroundColor Yellow
+    foreach ($port in $ports) {
+        $processInfo = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | 
+                      Select-Object -ExpandProperty OwningProcess
+        if ($processInfo) {
+            Write-Host "Puerto $port en uso. Terminando proceso..." -ForegroundColor Yellow
+            Stop-Process -Id $processInfo -Force
+            Start-Sleep -Seconds 1
+        }
+    }
+}
+
 Write-Host "Iniciando servicios de ElectroPlus..." -ForegroundColor Green
 
 # Cargar variables de entorno desde .env
@@ -101,6 +118,20 @@ VENTAS_URL=$([Environment]::GetEnvironmentVariable("VENTAS_URL"))
 # Directorio base
 $BASE_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Limpiar puertos antes de iniciar
+Clear-UsedPorts -ports @($GATEWAY_PORT, $INVENTARIO_PORT, $VENTAS_PORT)
+
+# Verificar el estado del entorno virtual
+$venvPath = Join-Path $BASE_DIR "venv"
+if (-not (Test-Path $venvPath)) {
+    Write-Host "Creando entorno virtual..." -ForegroundColor Yellow
+    python -m venv venv
+    . $venvPath\Scripts\activate.ps1
+    python -m pip install --upgrade pip
+} else {
+    . $venvPath\Scripts\activate.ps1
+}
+
 # Iniciar M-Inventario
 $inventarioPath = Join-Path $BASE_DIR "ElectroPlus-M-Inventario"
 if (-not (Start-DjangoService -serviceName "M-Inventario" -path $inventarioPath -port $INVENTARIO_PORT -secretKeyVar "INVENTARIO_SECRET_KEY")) {
@@ -123,6 +154,31 @@ Write-Host "`nTodos los servicios están en ejecución:" -ForegroundColor Green
 Write-Host "Gateway: http://localhost:$GATEWAY_PORT"
 Write-Host "M-Inventario: http://localhost:$INVENTARIO_PORT"
 Write-Host "M-Ventas: http://localhost:$VENTAS_PORT"
+
+# Ejecutar pruebas de integración
+Write-Host "`nEjecutando pruebas de integración..." -ForegroundColor Cyan
+Set-Location $gatewayPath
+python manage.py test gateway_app.tests.integration --verbosity=2
+
+# Verificar estado de los servicios
+function Test-ServiceHealth {
+    param($name, $url)
+    try {
+        $response = Invoke-WebRequest -Uri "$url/health/" -Method GET -TimeoutSec 5
+        if ($response.StatusCode -eq 200) {
+            Write-Host "${name} - Estado: OK" -ForegroundColor Green
+        } else {
+            Write-Host "${name} - Error (Status: $($response.StatusCode))" -ForegroundColor Red
+        }
+    } catch {
+        Write-Host "${name} - Error de conexión" -ForegroundColor Red
+    }
+}
+
+Write-Host "`nVerificando estado de los servicios:" -ForegroundColor Cyan
+Test-ServiceHealth -name "Gateway" -url "http://localhost:$GATEWAY_PORT"
+Test-ServiceHealth -name "M-Inventario" -url "http://localhost:$INVENTARIO_PORT"
+Test-ServiceHealth -name "M-Ventas" -url "http://localhost:$VENTAS_PORT"
 
 Write-Host "`nPresione Ctrl+C para detener todos los servicios" -ForegroundColor Yellow
 
