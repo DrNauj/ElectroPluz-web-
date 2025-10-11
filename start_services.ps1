@@ -3,6 +3,60 @@
 
 $ErrorActionPreference = "Stop"
 
+# Verificar requisitos previos
+function Test-Requirements {
+    try {
+        $pythonVersion = python --version 2>&1
+        if (-not $?) {
+            Write-Host "ERROR: Python no está instalado o no está en el PATH" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "Python detectado: $pythonVersion" -ForegroundColor Green
+        
+        $pipVersion = pip --version 2>&1
+        if (-not $?) {
+            Write-Host "ERROR: pip no está instalado" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "pip detectado: $pipVersion" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "ERROR: No se pudieron verificar los requisitos" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Función para esperar que un servicio esté disponible
+function Wait-ServiceReady {
+    param(
+        $serviceName,
+        $url,
+        $maxAttempts = 30,
+        $waitSeconds = 2
+    )
+    Write-Host "Esperando que $serviceName esté listo..." -ForegroundColor Yellow
+    
+    for ($i = 1; $i -le $maxAttempts; $i++) {
+        try {
+            $response = Invoke-WebRequest -Uri "$url/health/" -Method GET -TimeoutSec 2
+            if ($response.StatusCode -eq 200) {
+                Write-Host "$serviceName está listo!" -ForegroundColor Green
+                return $true
+            }
+        }
+        catch {
+            Write-Host "Intento $i de $maxAttempts..." -ForegroundColor Yellow
+            Start-Sleep -Seconds $waitSeconds
+        }
+    }
+    
+    Write-Host "ERROR: $serviceName no respondió después de $($maxAttempts * $waitSeconds) segundos" -ForegroundColor Red
+    return $false
+}
+
+Write-Host "Verificando requisitos del sistema..." -ForegroundColor Cyan
+Test-Requirements
+
 # Función para limpiar procesos existentes en puertos
 function Clear-UsedPorts {
     param(

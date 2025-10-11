@@ -22,7 +22,7 @@ urlpatterns = [
     
     # Perfil y pedidos
     path('perfil/', views.profile, name='profile'),
-    path('perfil/editar/', views.profile_edit, name='profile_edit'),
+    path('perfil/editar/', views.api_profile_edit, name='profile_edit'),
     path('pedidos/', views.orders, name='orders'),
     path('pedido/<str:order_id>/', views.order_detail, name='order_detail'),
     
