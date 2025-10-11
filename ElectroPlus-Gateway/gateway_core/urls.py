@@ -14,11 +14,7 @@ urlpatterns = [
     path('', include('storefront.urls')), 
     
     # Dashboard y sus submódulos
-    # CRÍTICO: Se añade el namespace 'dashboard' aquí para que las redirecciones funcionen (e.g., redirect('dashboard:inventory:list_products'))
-    path('dashboard/', include(([
-        path('', gateway_views.dashboard, name='dashboard'),  # Vista principal del dashboard (inventario/ventas)
-        path('inventory/', include('inventory.urls')),  # Submódulos del inventario
-    ], 'dashboard'), namespace='dashboard')), 
+    path('dashboard/', include('inventory.urls', namespace='dashboard')),
     
     # Rutas de autenticación (login, register, logout, APIs, customer-dashboard)
     path('auth/', include('gateway_app.urls')),

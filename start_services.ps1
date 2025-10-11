@@ -1,6 +1,9 @@
 # Script de arranque para ElectroPlus
 # Inicia todos los microservicios y el gateway
 
+# Configurar codificación UTF-8
+$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::UTF8
+
 $ErrorActionPreference = "Stop"
 
 # Verificar requisitos previos
@@ -212,7 +215,10 @@ Write-Host "M-Ventas: http://localhost:$VENTAS_PORT"
 # Ejecutar pruebas de integración
 Write-Host "`nEjecutando pruebas de integración..." -ForegroundColor Cyan
 Set-Location $gatewayPath
-python manage.py test gateway_app.tests.integration --verbosity=2
+# Esperamos unos segundos para asegurar que los servicios estén listos
+Start-Sleep -Seconds 5
+# Ejecutar las pruebas del directorio de integración específicamente
+python manage.py test gateway_app.tests.integration.test_microservices --verbosity=2
 
 # Verificar estado de los servicios
 function Test-ServiceHealth {
