@@ -1,32 +1,34 @@
 from django.urls import path
-from . import views
-from . import views_auth
+# IMPORTANTE: Cambiamos la importación de views_auth a views
+from . import views 
+
+# app_name se usa para referenciar las rutas dentro de las plantillas (ej: {% url 'auth:login' %})
+app_name = 'auth'
 
 urlpatterns = [
-    # Home y catálogo
-    path('', views.home, name='home'),
-    path('catalog/', views.home, name='catalog'),  # Mismo view que home por ahora
-    path('category/<slug:slug>/', views.category_products, name='category_products'),
+    # ----------------------------------------------------
+    # Vistas de Autenticación (Formularios para el usuario)
+    # ----------------------------------------------------
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
+    path('register/', views.register_view, name='register'), # Añadida la ruta de registro
     
-    # Autenticación
-    path('login/', views_auth.login_view, name='login'),
-    path('logout/', views_auth.logout_view, name='logout'),
-    path('register/', views_auth.register_view, name='register'),
-    # path('password-reset/', views_auth.password_reset_view, name='password_reset'),  # Pendiente
+    # ----------------------------------------------------
+    # Vistas de Dashboards (Requieren login_required)
+    # ----------------------------------------------------
+    # Ruta principal después de loguearse (redirige según el rol)
+    path('dashboard/', views.dashboard_view, name='dashboard'), 
     
-    # Dashboards
-    path('dashboard/', views_auth.dashboard_view, name='dashboard'),
-    path('dashboard/admin/', views_auth.admin_dashboard, name='admin_dashboard'),
-    path('dashboard/employee/', views_auth.employee_dashboard, name='employee_dashboard'),
-    path('dashboard/customer/', views_auth.customer_dashboard, name='customer_dashboard'),
+    # Rutas específicas del dashboard
+    path('dashboard/admin/', views.admin_dashboard, name='admin_dashboard'),
+    path('dashboard/employee/', views.employee_dashboard, name='employee_dashboard'),
+    path('dashboard/customer/', views.customer_dashboard, name='customer_dashboard'),
     
-    # API endpoints
-    path('api/productos/', views.ProductosAPIView.as_view(), name='api_productos'),
-    path('api/ventas/', views.VentasAPIView.as_view(), name='api_ventas'),
+    # ----------------------------------------------------
+    # API Endpoints (Para comunicación AJAX/Microservicios)
+    # ----------------------------------------------------
+    path('api/login/', views.login_api, name='login_api'),
+    path('api/logout/', views.logout_api, name='logout_api'),
+    path('api/register/', views.register_api, name='register_api'),
     path('api/check-auth/', views.check_auth, name='check_auth'),
-    
-    # Carrito y perfil
-    path('cart/', views.cart_view, name='cart'),
-    path('add-to-cart/<int:product_id>/', views.add_to_cart, name='add_to_cart'),
-    path('profile/', views.profile_view, name='profile'),
 ]

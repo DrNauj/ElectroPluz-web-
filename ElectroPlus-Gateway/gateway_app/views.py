@@ -1,393 +1,429 @@
 """
-Views for gateway app - ElectroPlus implementation
-"""
+Vistas de autenticación y funciones base del gateway.
 
-import requests
-import logging
-from django.conf import settings
-from django.contrib import messages
+Este módulo proporciona las vistas y funciones básicas necesarias para la
+autenticación y funcionalidad base del gateway, actuando como intermediario
+hacia los microservicios de Ventas e Inventario.
+"""
 from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.contrib.auth import logout
+from django.conf import settings
 from django.views.decorators.http import require_http_methods
-from rest_framework.views import APIView
+from django.http import JsonResponse # Importación añadida para compatibilidad si se necesitara
+# Se mantienen los imports de DRF para las funciones _api
 from rest_framework.response import Response
 from rest_framework import status
-from django.core.paginator import Paginator
-from django.http import JsonResponse
-from .forms import LoginForm, RegisterForm
+import requests
+import logging
+import json
+
+# IMPORTANTE: Se actualiza el import para usar CustomLoginForm según el archivo forms.py
+from .forms import CustomLoginForm, RegisterForm
 
 logger = logging.getLogger(__name__)
 
-def home(request):
+def authenticate_with_service(username_or_id, password):
     """
-    Vista principal de la tienda que muestra productos y categorías
+    Autentica el usuario contra el servicio de ventas.
+    
+    Mapea los nombres de variables locales (username, password) a los esperados 
+    por el microservicio ('nombre_usuario', 'contrasena').
     """
     try:
-        # Obtener productos del servicio de inventario
-        products_response = requests.get(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/productos/",
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
+        response = requests.post(
+            f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}auth/login/",
+            json={
+                'nombre_usuario': username_or_id,
+                'contrasena': password
+            },
+            headers={
+                'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY']
+            },
+            timeout=5
         )
-        products_data = products_response.json()
         
-        # Obtener categorías
-        categories_response = requests.get(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/categorias/",
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-        )
-        categories = categories_response.json()
+        if response.status_code == 200:
+            data = response.json()
+            # Se devuelven los datos crudos del usuario autenticado
+            return {
+                'id': data['id'],
+                'nombre_usuario': data['nombre_usuario'],
+                'rol': data['rol'],
+                'token': data['token']
+            }
         
-        # Aplicar filtros
-        category = request.GET.get('category')
-        sort = request.GET.get('sort')
-        search = request.GET.get('search')
+        return None
         
-        if category:
-        
-        'user': user_data
-    })
- 
-def cart_view(request):
-    """Mostrar el carrito almacenado en la sesión"""
-    cart = request.session.get('cart', {})
-    cart_count = request.session.get('cart_count', 0)
-    return render(request, 'shop/cart.html', {'cart': cart, 'cart_count': cart_count})
-
+    except requests.RequestException:
+        logger.error("Error al autenticar con el servicio de ventas", exc_info=True)
+        return None
 
 @require_http_methods(["POST"])
-    except requests.RequestException as e:
-        if not category:
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
+def login_api(request):
+    """API para login de usuarios (usando JSON body)"""
+    try:
+        data = json.loads(request.body)
+        username = data.get('username')
+        password = data.get('password')
         
-                products_data = sorted(products_data, key=lambda x: x['nombre'])
-        products = paginator.get_page(page)
-        return render(request, 'base/dashboard.html', {})
-"""
-Cleaned views for gateway_app. Restores public views and API proxies.
-"""
+        if not username or not password:
+            return Response({
+                'success': False,
+                'error': 'Nombre de usuario y contraseña son requeridos'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        # Llamada a la función de autenticación
+        user = authenticate_with_service(username, password)
+        
+        if user:
+            # Almacenar en la sesión de Django
+            request.session['user'] = user
+            request.session['is_authenticated'] = True 
+            
+            return Response({
+                'success': True,
+                'user': {
+                    'id': user['id'],
+                    'username': user['nombre_usuario'],
+                    'role': user['rol']
+                }
+            })
+            
+        return Response({
+            'success': False,
+            'error': 'Credenciales inválidas'
+        }, status=status.HTTP_401_UNAUTHORIZED)
+        
+    except json.JSONDecodeError:
+        return Response({
+            'success': False,
+            'error': 'Datos JSON inválidos'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
-import logging
-import requests
-from django.conf import settings
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.views.decorators.http import require_http_methods
-from django.core.paginator import Paginator
-from django.http import JsonResponse
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
+@require_http_methods(["POST"])
+def logout_api(request):
+    """API para logout de usuarios"""
+    logout(request)
+    return Response({'success': True})
 
-logger = logging.getLogger(__name__)
-
-
-def home(request):
-    try:
-        products_response = requests.get(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/productos/",
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-        )
-        products_data = products_response.json()
-
-        categories_response = requests.get(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/categorias/",
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-        )
-        categories = categories_response.json()
-
-        category = request.GET.get('category')
-        sort = request.GET.get('sort')
-        search = request.GET.get('search')
-
-        if category:
-            try:
-                cid = int(category)
-                products_data = [p for p in products_data if p.get('categoria') == cid]
-            except Exception:
-                pass
-
-        if search:
-            s = search.lower()
-            products_data = [p for p in products_data if s in p.get('nombre', '').lower() or s in p.get('descripcion', '').lower()]
-
-        if sort:
-            if sort == 'price_low':
-                products_data = sorted(products_data, key=lambda x: float(x.get('precio', 0)))
-            elif sort == 'price_high':
-                products_data = sorted(products_data, key=lambda x: float(x.get('precio', 0)), reverse=True)
-            elif sort == 'name':
-                products_data = sorted(products_data, key=lambda x: x.get('nombre', ''))
-            else:
-                products_data = sorted(products_data, key=lambda x: x.get('id', 0), reverse=True)
-
-        paginator = Paginator(products_data, 12)
-        page = request.GET.get('page')
-        products = paginator.get_page(page)
-
-        special_offers = [p for p in products_data if p.get('descuento', 0) > 0][:4]
-
-        context = {
-            'products': products,
-            'categories': categories,
-            'special_offers': special_offers,
-            'active_category': category,
-            'active_sort': sort,
-            'search_query': search,
-            'cart_count': request.session.get('cart_count', 0),
-        }
-        return render(request, 'shop/home.html', context)
-    except requests.RequestException as e:
-        logger.error(f"Error al obtener datos de productos: {e}")
-        messages.error(request, "Error al cargar los productos. Por favor, intente más tarde.")
-        return render(request, 'shop/home.html', {'error': True, 'categories': [], 'products': [], 'special_offers': []})
-
-
-def category_products(request, slug):
-    try:
-        categories_response = requests.get(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/categorias/",
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-        )
-        categories = categories_response.json()
-        category = next((c for c in categories if c.get('slug') == slug), None)
-        if not category:
-            messages.error(request, "Categoría no encontrada")
-            return redirect('home')
-
-        products_response = requests.get(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/productos/?categoria={category.get('id')}",
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-        )
-        products_data = products_response.json()
-
-        sort = request.GET.get('sort')
-        search = request.GET.get('search')
-        if search:
-            s = search.lower()
-            products_data = [p for p in products_data if s in p.get('nombre', '').lower() or s in p.get('descripcion', '').lower()]
-        if sort:
-            if sort == 'price_low':
-                products_data = sorted(products_data, key=lambda x: float(x.get('precio', 0)))
-            elif sort == 'price_high':
-                products_data = sorted(products_data, key=lambda x: float(x.get('precio', 0)), reverse=True)
-            elif sort == 'name':
-                products_data = sorted(products_data, key=lambda x: x.get('nombre', ''))
-            else:
-                products_data = sorted(products_data, key=lambda x: x.get('id', 0), reverse=True)
-
-        paginator = Paginator(products_data, 12)
-        page = request.GET.get('page')
-        products = paginator.get_page(page)
-
-        context = {
-            'category': category,
-            'products': products,
-            'categories': categories,
-            'active_sort': sort,
-            'search_query': search,
-            'cart_count': request.session.get('cart_count', 0),
-        }
-        return render(request, 'shop/category.html', context)
-    except requests.RequestException as e:
-        logger.error(f"Error al obtener productos de la categoría: {e}")
-        messages.error(request, "Error de conexión. Por favor, intente más tarde.")
-        return redirect('home')
-
-
+@require_http_methods(["GET"])
 def check_auth(request):
-    return JsonResponse({'is_authenticated': request.session.get('is_authenticated', False), 'user': request.session.get('user', {})})
-
-
-def cart_view(request):
-    cart = request.session.get('cart', {})
-    cart_count = request.session.get('cart_count', 0)
-    return render(request, 'shop/cart.html', {'cart': cart, 'cart_count': cart_count})
-
-
-@require_http_methods(["POST"])
-def add_to_cart(request, product_id):
-    cart = request.session.get('cart', {})
-    item = cart.get(str(product_id), {'product_id': product_id, 'cantidad': 0})
-    item['cantidad'] = item.get('cantidad', 0) + 1
-    cart[str(product_id)] = item
-    request.session['cart'] = cart
-    request.session['cart_count'] = sum(i.get('cantidad', 0) for i in cart.values())
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or getattr(request, 'is_ajax', lambda: False)():
-        return JsonResponse({'success': True, 'cart_count': request.session['cart_count']})
-    return redirect('catalog')
-
-
-def profile_view(request):
-    if request.session.get('is_authenticated'):
-        return redirect('dashboard')
-    return redirect('login')
-
+    """API para verificar estado de autenticación (DRF Response)"""
+    user = request.session.get('user')
+    
+    if user and request.session.get('is_authenticated'):
+        return Response({
+            'success': True,
+            'user': {
+                'id': user['id'],
+                'username': user['nombre_usuario'],
+                'role': user['rol']
+            }
+        })
+        
+    # Usamos la respuesta de DRF con 401 para API
+    return Response({
+        'success': False,
+        'error': 'Usuario no autenticado'
+    }, status=status.HTTP_401_UNAUTHORIZED)
 
 @require_http_methods(["POST"])
-def create_venta(request):
-    if not request.session.get('is_authenticated'):
-        return Response({"error": "Usuario no autenticado"}, status=status.HTTP_401_UNAUTHORIZED)
-    productos_validos = True
-    error_message = ""
-    for producto in request.data.get('productos', []):
-        stock_response = requests.get(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}productos/{producto['id']}/stock/",
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-        )
-        if stock_response.status_code != 200:
-            productos_validos = False
-            error_message = f"Error al verificar stock del producto {producto['id']}"
-            break
-        stock_data = stock_response.json()
-        if stock_data.get('stock', 0) < producto.get('cantidad', 0):
-            productos_validos = False
-            error_message = f"Stock insuficiente para el producto {producto['id']}"
-            break
-    if not productos_validos:
-        return Response({"error": error_message}, status=status.HTTP_400_BAD_REQUEST)
-    venta_response = requests.post(
-        f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}ventas/",
-        json=request.data,
-        headers={
-            'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
-            'Authorization': f"Token {request.session.get('user',{}).get('token','')}"
-        }
-    )
-    if venta_response.status_code != 201:
-        return Response(venta_response.json(), status=venta_response.status_code)
-    venta_data = venta_response.json()
-    for producto in request.data.get('productos', []):
-        stock_update_response = requests.patch(
-            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}productos/{producto['id']}/stock/",
-            json={'cantidad': -producto['cantidad']},
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-        )
-        if stock_update_response.status_code != 200:
-            logger.error(f"Error al actualizar stock del producto {producto['id']}")
-    return Response(venta_data, status=status.HTTP_201_CREATED)
+def register_api(request):
+    """API para registro de nuevos clientes (usando JSON body)"""
+    try:
+        data = json.loads(request.body)
+        
+        # Validación de campos mínimos (usando los nombres que espera el API)
+        if not all(k in data for k in ['first_name', 'email', 'username', 'password']):
+             return Response({
+                'success': False,
+                'error': 'Faltan campos requeridos (nombre, email, username, password)'
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-
-def get_ventas(request):
-    if not request.session.get('is_authenticated'):
-        return Response({"error": "Usuario no autenticado"}, status=status.HTTP_401_UNAUTHORIZED)
-    ventas_response = requests.get(
-        f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}ventas/",
-        headers={
-            'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
-            'Authorization': f"Token {request.session.get('user',{}).get('token','')}"
-        }
-    )
-    if ventas_response.status_code != 200:
-        return Response(ventas_response.json(), status=ventas_response.status_code)
-    ventas_data = ventas_response.json()
-    for venta in ventas_data:
-        for producto in venta.get('productos', []):
-            producto_response = requests.get(
-                f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}productos/{producto.get('producto_id')}/",
-                headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-            )
-            if producto_response.status_code == 200:
-                producto.update(producto_response.json())
-    return Response({'ventas': ventas_data})
-
-
-class ProductosAPIView(APIView):
-    def get(self, request):
-        try:
-            response = requests.get(
-                f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}productos/",
-                headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-            )
-            return Response(response.json(), status=response.status_code)
-        except requests.RequestException as e:
-            logger.error(f"Error al conectar con el servicio de inventario: {e}")
-            return Response({"error": f"Error al conectar con el servicio de inventario: {e}"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    def post(self, request):
         try:
             response = requests.post(
-                f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}productos/",
-                json=request.data,
-                headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
+                f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}api/clientes/registro/",
+                json={
+                    # Mapeo a los nombres esperados por el microservicio
+                    'nombre': data.get('first_name') or data.get('nombre', ''),
+                    'email': data['email'],
+                    'nombre_usuario': data['username'],
+                    'contrasena': data['password']
+                },
+                headers={'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY']},
+                timeout=5
             )
-            return Response(response.json(), status=response.status_code)
+            
+            if response.status_code == 201:
+                return Response({
+                    'success': True,
+                    'message': 'Registro exitoso'
+                })
+            else:
+                error_data = response.json()
+                error_msg = error_data.get('detail', 'Error en el registro')
+                return Response({
+                    'success': False,
+                    'error': error_msg
+                }, status=response.status_code)
+                
         except requests.RequestException as e:
-            logger.error(f"Error al crear producto: {e}")
-            return Response({"error": "Error al crear el producto"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-
-class VentasAPIView(APIView):
-    def get(self, request):
-        try:
-            response = requests.get(
-                f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}ventas/",
-                headers={
-                    'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
-                    'Authorization': f"Token {request.session.get('user',{}).get('token','')}"
-                }
-            )
-            return Response(response.json(), status=response.status_code)
-        except requests.RequestException as e:
-            logger.error(f"Error al conectar con el servicio de ventas: {e}")
-            return Response({"error": f"Error al conectar con el servicio de ventas: {e}"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-    def post(self, request):
-        try:
-            for producto in request.data.get('productos', []):
-                stock_response = requests.get(
-                    f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}productos/{producto['id']}/stock/",
-                    headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-                )
-                if stock_response.status_code != 200:
-                    return Response({"error": "Error al validar stock"}, status=status.HTTP_400_BAD_REQUEST)
-                stock_data = stock_response.json()
-                if stock_data.get('stock', 0) < producto.get('cantidad', 0):
-                    return Response({"error": f"Stock insuficiente para el producto {producto['id']}"}, status=status.HTTP_400_BAD_REQUEST)
-
-            venta_response = requests.post(
-                f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}ventas/",
-                json=request.data,
-                headers={
-                    'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
-                    'Authorization': f"Token {request.session.get('user',{}).get('token','')}"
-                }
-            )
-
-            if venta_response.status_code != 201:
-                return Response(venta_response.json(), status=venta_response.status_code)
-
-            venta_data = venta_response.json()
-            for producto in request.data.get('productos', []):
-                stock_update_response = requests.patch(
-                    f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}productos/{producto['id']}/stock/",
-                    json={'cantidad': -producto['cantidad']},
-                    headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
-                )
-                if stock_update_response.status_code != 200:
-                    logger.error(f"Error al actualizar stock del producto {producto['id']}")
-
-            return Response(venta_data, status=status.HTTP_201_CREATED)
-        except requests.RequestException as e:
-            logger.error(f"Error al realizar la venta: {e}")
-            return Response({"error": "Error al procesar la venta"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-            return Response(venta_data, status=status.HTTP_201_CREATED)
-
-        except requests.RequestException as e:
-            logger.error(f"Error al realizar la venta: {str(e)}")
-            return Response(
-                {"error": "Error al procesar la venta"}, 
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
-            )
-
-            # Devolver la estructura esperada por los tests
-            return Response({'ventas': ventas_data})
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error al comunicarse con los microservicios: {str(e)}")
+            logger.error(f"Error al registrar cliente: {str(e)}")
             return Response({
-                'status': 'error',
-                'message': 'Error al obtener datos de los microservicios',
-                'error': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'success': False,
+                'error': 'Error de conexión: El servicio de registro no está disponible'
+            }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            
+    except json.JSONDecodeError:
+        return Response({
+            'success': False,
+            'error': 'Datos JSON inválidos'
+        }, status=status.HTTP_400_BAD_REQUEST)
 
+@require_http_methods(["GET", "POST"])
+def register_view(request):
+    """Vista de registro de clientes (usando formularios tradicionales de Django)"""
+    if request.method == "POST":
+        form = RegisterForm(request.POST) 
+        if form.is_valid():
+            
+            # Mapeo de campos del formulario a la estructura esperada por el microservicio
+            data_to_send = {
+                'nombre': form.cleaned_data['first_name'],
+                'email': form.cleaned_data['email'],
+                'nombre_usuario': form.cleaned_data['username'],
+                'contrasena': form.cleaned_data['password']
+            }
+            
+            try:
+                response = requests.post(
+                    f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}api/clientes/registro/",
+                    json=data_to_send,
+                    headers={'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY']},
+                    timeout=5
+                )
+                
+                if response.status_code == 201:
+                    messages.success(request, '¡Registro exitoso! Ya puedes iniciar sesión.')
+                    return redirect('login')
+                else:
+                    error_data = response.json()
+                    # Muestra un mensaje de error general o específico del microservicio
+                    error_msg = error_data.get('detail', 'Ocurrió un error al registrar el usuario. Intente con otro nombre de usuario o email.')
+                    messages.error(request, error_msg)
+            
+            except requests.RequestException as e:
+                logger.error(f"Error al registrar cliente desde register_view: {str(e)}")
+                messages.error(request, 'Error de conexión con el servicio. Intente más tarde.')
+                
+        # Si el formulario no es válido o hay un error de microservicio, se renderiza de nuevo con el formulario y errores.
+    else:
+        form = RegisterForm()
+    
+    return render(request, 'auth/register.html', {'form': form})
 
+@require_http_methods(["GET", "POST"])
+def login_view(request):
+    """Vista de login (usando formularios tradicionales de Django)"""
+    if request.method == "POST":
+        # Usamos CustomLoginForm
+        # El argumento 'request' es necesario porque CustomLoginForm hereda de AuthenticationForm
+        form = CustomLoginForm(request, data=request.POST) 
+        if form.is_valid():
+            # **AJUSTE CRÍTICO:** Los campos ahora son 'username' y 'password'
+            username = form.cleaned_data['username']
+            password = form.cleaned_data['password']
+            
+            # user_type se infiere del nombre de usuario si es necesario
+            user_type = 'customer'
+            # La lógica de prefijos para empleados se mueve a la verificación de rol
+            
+            remember = form.cleaned_data.get('remember', False)
+            
+            user_data = authenticate_with_service(username, password)
+            
+            if user_data:
+                # 1. Verificar Rol esperado (se mantiene la lógica original de prefijos/roles)
+                # Esta lógica de prefijo (EMP) debería estar idealmente en el microservicio.
+                expected_role = 'empleado' if username.startswith('EMP') else 'cliente'
+                
+                if user_data['rol'] != expected_role:
+                    messages.error(request, 'Tipo de usuario o credenciales incorrectas para este acceso.')
+                    return render(request, 'auth/login.html', {'form': form})
+                
+                # 2. Establecer Sesión
+                request.session['user'] = user_data
+                request.session['is_authenticated'] = True
+                
+                # 3. Control de "Recordarme"
+                if remember:
+                    request.session.set_expiry(30 * 24 * 60 * 60)  # 30 días
+                else:
+                    request.session.set_expiry(0)  # Sesión de navegador
+                
+                messages.success(request, f'¡Bienvenido de nuevo, {user_data["nombre_usuario"]}!')
+                
+                # 4. Redirección
+                if user_data['rol'] == 'empleado':
+                    return redirect('employee_dashboard')
+                else:
+                    return redirect('customer_dashboard')
+            else:
+                # Error de autenticación del servicio
+                messages.error(request, 'Usuario o contraseña incorrectos.')
+        # Si el formulario no es válido, los errores se mostrarán en la plantilla
+    else:
+        # Usamos CustomLoginForm
+        form = CustomLoginForm()
+    
+    return render(request, 'auth/login.html', {'form': form})
+
+def logout_view(request):
+    """Vista de logout"""
+    request.session.flush()
+    messages.info(request, 'Has cerrado sesión correctamente')
+    return redirect('login')
+
+def login_required(view_func):
+    """Decorador personalizado de login_required para microservicios"""
+    def wrapper(request, *args, **kwargs):
+        if not request.session.get('is_authenticated'):
+            messages.error(request, 'Debe iniciar sesión para acceder a esta página')
+            return redirect('login')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+@login_required
+def dashboard_view(request):
+    """Vista del dashboard principal"""
+    rol = request.session['user']['rol']
+    if rol == 'empleado':
+        return redirect('employee_dashboard')
+    else:
+        return redirect('customer_dashboard')
+
+@login_required
+def admin_dashboard(request):
+    """Vista del dashboard de administrador. Se asume que solo ciertos empleados tienen acceso."""
+    try:
+        # Obtener estadísticas administrativas de VENTAS
+        ventas_stats_response = requests.get(
+            f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}admin/estadisticas/",
+            headers={
+                'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
+                'Authorization': f'Token {request.session["user"]["token"]}'
+            },
+            timeout=5
+        )
+        
+        # Obtener estadísticas administrativas de INVENTARIO
+        inventario_stats_response = requests.get(
+            f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}admin/estadisticas/",
+            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']},
+            timeout=5
+        )
+        
+        if ventas_stats_response.status_code == 200 and inventario_stats_response.status_code == 200:
+            context = {
+                'ventas_stats': ventas_stats_response.json(),
+                'inventario_stats': inventario_stats_response.json()
+            }
+            return render(request, 'dashboard/admin_dashboard.html', context)
+        else:
+            # Mensaje de error detallado sobre qué servicio falló
+            error_msg = 'Error al cargar estadísticas.'
+            if ventas_stats_response.status_code != 200:
+                 error_msg += f" (Ventas: HTTP {ventas_stats_response.status_code})"
+            if inventario_stats_response.status_code != 200:
+                 error_msg += f" (Inventario: HTTP {inventario_stats_response.status_code})"
+                 
+            messages.error(request, error_msg)
+            return render(request, 'dashboard/admin_dashboard.html', {})
+            
+    except requests.RequestException as e:
+        logger.error(f"Error al obtener estadísticas del administrador: {str(e)}")
+        messages.error(request, 'Error de conexión con los servicios. Intente más tarde.')
+        return render(request, 'dashboard/admin_dashboard.html', {})
+
+@login_required
+def employee_dashboard(request):
+    """Vista del dashboard de empleado"""
+    if request.session['user']['rol'] != 'empleado':
+        messages.error(request, 'Acceso no autorizado: Solo empleados.')
+        return redirect('dashboard')
+        
+    try:
+        # Obtener datos del empleado (perfil)
+        employee_response = requests.get(
+            f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}empleados/perfil/",
+            headers={
+                'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
+                'Authorization': f'Token {request.session["user"]["token"]}'
+            },
+            timeout=5
+        )
+        
+        # Obtener tareas pendientes
+        tasks_response = requests.get(
+            f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}empleados/tareas/",
+            headers={
+                'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
+                'Authorization': f'Token {request.session["user"]["token"]}'
+            },
+            timeout=5
+        )
+        
+        context = {}
+        if employee_response.status_code == 200:
+            context['employee_info'] = employee_response.json()
+        if tasks_response.status_code == 200:
+            context['tasks'] = tasks_response.json()
+            
+        return render(request, 'dashboard/employee_dashboard.html', context)
+            
+    except requests.RequestException as e:
+        logger.error(f"Error al obtener datos del empleado: {str(e)}")
+        messages.error(request, 'Error de conexión con los servicios. Intente más tarde.')
+        return render(request, 'dashboard/employee_dashboard.html', {})
+
+@login_required
+def customer_dashboard(request):
+    """Vista del dashboard de cliente"""
+    if request.session['user']['rol'] != 'cliente':
+        messages.error(request, 'Acceso no autorizado: Solo clientes.')
+        return redirect('dashboard')
+        
+    try:
+        # Obtener datos del cliente (perfil)
+        customer_response = requests.get(
+            f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}clientes/perfil/",
+            headers={
+                'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
+                'Authorization': f'Token {request.session["user"]["token"]}'
+            },
+            timeout=5
+        )
+        
+        # Obtener historial de pedidos
+        orders_response = requests.get(
+            f"{settings.MICROSERVICES['VENTAS']['BASE_URL']}clientes/pedidos/",
+            headers={
+                'X-API-Key': settings.MICROSERVICES['VENTAS']['API_KEY'],
+                'Authorization': f'Token {request.session["user"]["token"]}'
+            },
+            timeout=5
+        )
+        
+        context = {}
+        if customer_response.status_code == 200:
+            context['customer_info'] = customer_response.json()
+        if orders_response.status_code == 200:
+            context['orders'] = orders_response.json()
+            
+        return render(request, 'dashboard/customer_dashboard.html', context)
+            
+    except requests.RequestException as e:
+        logger.error(f"Error al obtener datos del cliente: {str(e)}")
+        messages.error(request, 'Error de conexión con los servicios. Intente más tarde.')
+        return render(request, 'dashboard/customer_dashboard.html', {})

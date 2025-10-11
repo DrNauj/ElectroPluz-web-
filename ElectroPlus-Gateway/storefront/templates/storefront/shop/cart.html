@@ -1,0 +1,223 @@
+{% extends "storefront/base.html" %}
+{% load static %}
+
+{% block title %}Carrito de Compras - ElectroPlus{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <h1 class="mb-4">Carrito de Compras</h1>
+
+    {% if error %}
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        Error al cargar el carrito. Por favor, intente de nuevo.
+    </div>
+    {% else %}
+
+    {% if cart_items %}
+    <div class="row">
+        <!-- Cart Items List -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    {% for item in cart_items %}
+                    <div class="cart-item mb-3 {% if not forloop.last %}border-bottom pb-3{% endif %}">
+                        <div class="row align-items-center">
+                            <!-- Product Image -->
+                            <div class="col-3 col-md-2">
+                                {% if item.product.imagen %}
+                                <img src="{{ item.product.imagen.url }}" class="img-fluid rounded" alt="{{ item.product.nombre }}">
+                                {% else %}
+                                <div class="bg-light text-center p-3 rounded">
+                                    <i class="fas fa-image text-secondary"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Product Details -->
+                            <div class="col-9 col-md-4">
+                                <h5 class="mb-1">{{ item.product.nombre }}</h5>
+                                <p class="text-muted mb-0">${{ item.product.precio }}</p>
+                            </div>
+                            
+                            <!-- Quantity Controls -->
+                            <div class="col-7 col-md-4 mt-3 mt-md-0">
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary" type="button" 
+                                            onclick="updateQuantity({{ item.product.id }}, 'decrease')">-</button>
+                                    <input type="number" class="form-control text-center" value="{{ item.quantity }}"
+                                           min="1" max="{{ item.product.stock }}" readonly>
+                                    <button class="btn btn-outline-secondary" type="button"
+                                            onclick="updateQuantity({{ item.product.id }}, 'increase')">+</button>
+                                </div>
+                            </div>
+                            
+                            <!-- Subtotal and Remove -->
+                            <div class="col-5 col-md-2 mt-3 mt-md-0 text-end">
+                                <p class="mb-1">${{ item.subtotal }}</p>
+                                <button class="btn btn-link text-danger p-0" 
+                                        onclick="removeItem({{ item.product.id }})">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="col-md-4 mt-4 mt-md-0">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Resumen de la Orden</h5>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal</span>
+                        <span>${{ cart_total }}</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>IVA (16%)</span>
+                        <span>${{ tax }}</span>
+                    </div>
+                    
+                    {% if shipping_cost %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Envío</span>
+                        <span>${{ shipping_cost }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between mb-4">
+                        <strong>Total</strong>
+                        <strong>${{ total_with_tax }}</strong>
+                    </div>
+                    
+                    <a href="{% url 'checkout' %}" class="btn btn-primary w-100">
+                        Proceder al Pago
+                    </a>
+                    
+                    <a href="{% url 'home' %}" class="btn btn-link w-100 mt-2">
+                        Continuar Comprando
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
+        <h3>Tu carrito está vacío</h3>
+        <p class="text-muted">¡Agrega algunos productos para empezar!</p>
+        <a href="{% url 'home' %}" class="btn btn-primary mt-3">
+            Ir a la Tienda
+        </a>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+
+<!-- Toast Notifications -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="successToast" class="toast" role="alert">
+        <div class="toast-header bg-success text-white">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong class="me-auto">Éxito</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            Carrito actualizado exitosamente.
+        </div>
+    </div>
+    
+    <div id="errorToast" class="toast" role="alert">
+        <div class="toast-header bg-danger text-white">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <strong class="me-auto">Error</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body">
+            Ocurrió un error al actualizar el carrito.
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function updateQuantity(productId, action) {
+        try {
+            const response = await fetch('/api/cart/update/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    product_id: productId,
+                    action: action
+                })
+            });
+
+            if (response.ok) {
+                location.reload();
+            } else {
+                throw new Error('Error al actualizar el carrito');
+            }
+        } catch (error) {
+            const errorToast = new bootstrap.Toast(document.getElementById('errorToast'));
+            errorToast.show();
+        }
+    }
+
+    async function removeItem(productId) {
+        if (!confirm('¿Estás seguro de que deseas eliminar este producto del carrito?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/cart/remove/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    product_id: productId
+                })
+            });
+
+            if (response.ok) {
+                location.reload();
+            } else {
+                throw new Error('Error al eliminar el producto');
+            }
+        } catch (error) {
+            const errorToast = new bootstrap.Toast(document.getElementById('errorToast'));
+            errorToast.show();
+        }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,263 @@
+{% extends "storefront/base.html" %}
+{% load static %}
+
+{% block title %}Checkout - ElectroPlus{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <!-- Checkout Form -->
+        <div class="col-md-8">
+            <h2 class="mb-4">Información de Envío</h2>
+            
+            {% if form.errors %}
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                Por favor, corrija los errores marcados en el formulario.
+            </div>
+            {% endif %}
+
+            <form id="checkoutForm" method="post" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <!-- Personal Information -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4">Información Personal</h5>
+                        
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="nombre" class="form-label">Nombre *</label>
+                                <input type="text" class="form-control {% if form.nombre.errors %}is-invalid{% endif %}" 
+                                       id="nombre" name="nombre" value="{{ form.nombre.value|default:'' }}" required>
+                                {% if form.nombre.errors %}
+                                <div class="invalid-feedback">{{ form.nombre.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="apellidos" class="form-label">Apellidos *</label>
+                                <input type="text" class="form-control {% if form.apellidos.errors %}is-invalid{% endif %}" 
+                                       id="apellidos" name="apellidos" value="{{ form.apellidos.value|default:'' }}" required>
+                                {% if form.apellidos.errors %}
+                                <div class="invalid-feedback">{{ form.apellidos.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control {% if form.email.errors %}is-invalid{% endif %}" 
+                                       id="email" name="email" value="{{ form.email.value|default:'' }}" required>
+                                {% if form.email.errors %}
+                                <div class="invalid-feedback">{{ form.email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="telefono" class="form-label">Teléfono *</label>
+                                <input type="tel" class="form-control {% if form.telefono.errors %}is-invalid{% endif %}" 
+                                       id="telefono" name="telefono" value="{{ form.telefono.value|default:'' }}" required>
+                                {% if form.telefono.errors %}
+                                <div class="invalid-feedback">{{ form.telefono.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Shipping Address -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4">Dirección de Envío</h5>
+                        
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label for="direccion" class="form-label">Dirección *</label>
+                                <input type="text" class="form-control {% if form.direccion.errors %}is-invalid{% endif %}" 
+                                       id="direccion" name="direccion" value="{{ form.direccion.value|default:'' }}" required>
+                                {% if form.direccion.errors %}
+                                <div class="invalid-feedback">{{ form.direccion.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="ciudad" class="form-label">Ciudad *</label>
+                                <input type="text" class="form-control {% if form.ciudad.errors %}is-invalid{% endif %}" 
+                                       id="ciudad" name="ciudad" value="{{ form.ciudad.value|default:'' }}" required>
+                                {% if form.ciudad.errors %}
+                                <div class="invalid-feedback">{{ form.ciudad.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="estado" class="form-label">Estado *</label>
+                                <select class="form-select {% if form.estado.errors %}is-invalid{% endif %}" 
+                                        id="estado" name="estado" required>
+                                    <option value="">Seleccionar...</option>
+                                    {% for estado in estados %}
+                                    <option value="{{ estado.id }}" {% if form.estado.value == estado.id %}selected{% endif %}>
+                                        {{ estado.nombre }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form.estado.errors %}
+                                <div class="invalid-feedback">{{ form.estado.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-2">
+                                <label for="cp" class="form-label">Código Postal *</label>
+                                <input type="text" class="form-control {% if form.cp.errors %}is-invalid{% endif %}" 
+                                       id="cp" name="cp" value="{{ form.cp.value|default:'' }}" required>
+                                {% if form.cp.errors %}
+                                <div class="invalid-feedback">{{ form.cp.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Method -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title mb-4">Método de Pago</h5>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="radio" name="metodo_pago" 
+                                   id="tarjeta" value="tarjeta" checked>
+                            <label class="form-check-label" for="tarjeta">
+                                <i class="fas fa-credit-card me-2"></i>Tarjeta de Crédito/Débito
+                            </label>
+                        </div>
+                        
+                        <div id="tarjetaForm" class="row g-3">
+                            <div class="col-12">
+                                <label for="numero_tarjeta" class="form-label">Número de Tarjeta *</label>
+                                <input type="text" class="form-control {% if form.numero_tarjeta.errors %}is-invalid{% endif %}" 
+                                       id="numero_tarjeta" name="numero_tarjeta" required>
+                                {% if form.numero_tarjeta.errors %}
+                                <div class="invalid-feedback">{{ form.numero_tarjeta.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="fecha_vencimiento" class="form-label">Fecha de Vencimiento *</label>
+                                <input type="text" class="form-control {% if form.fecha_vencimiento.errors %}is-invalid{% endif %}" 
+                                       id="fecha_vencimiento" name="fecha_vencimiento" placeholder="MM/YY" required>
+                                {% if form.fecha_vencimiento.errors %}
+                                <div class="invalid-feedback">{{ form.fecha_vencimiento.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="cvv" class="form-label">CVV *</label>
+                                <input type="text" class="form-control {% if form.cvv.errors %}is-invalid{% endif %}" 
+                                       id="cvv" name="cvv" required>
+                                {% if form.cvv.errors %}
+                                <div class="invalid-feedback">{{ form.cvv.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-grid">
+                    <button class="btn btn-primary btn-lg" type="submit">
+                        Realizar Pedido
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="col-md-4">
+            <div class="card position-sticky" style="top: 2rem;">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Resumen del Pedido</h5>
+                    
+                    {% for item in cart_items %}
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h6 class="mb-0">{{ item.product.nombre }}</h6>
+                            <small class="text-muted">Cantidad: {{ item.quantity }}</small>
+                        </div>
+                        <span>${{ item.subtotal }}</span>
+                    </div>
+                    {% endfor %}
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal</span>
+                        <span>${{ cart_total }}</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>IVA (16%)</span>
+                        <span>${{ tax }}</span>
+                    </div>
+                    
+                    {% if shipping_cost %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Envío</span>
+                        <span>${{ shipping_cost }}</span>
+                    </div>
+                    {% endif %}
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between">
+                        <strong>Total</strong>
+                        <strong>${{ total_with_tax }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Form validation
+    (function () {
+        'use strict'
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
+    })()
+
+    // Credit card input formatting
+    const creditCard = document.getElementById('numero_tarjeta')
+    creditCard.addEventListener('input', function (e) {
+        let value = e.target.value.replace(/\D/g, '')
+        value = value.replace(/(\d{4})(?=\d)/g, '$1 ')
+        e.target.value = value
+    })
+
+    // Expiry date formatting
+    const expiryDate = document.getElementById('fecha_vencimiento')
+    expiryDate.addEventListener('input', function (e) {
+        let value = e.target.value.replace(/\D/g, '')
+        if (value.length > 2) {
+            value = value.substring(0,2) + '/' + value.substring(2,4)
+        }
+        e.target.value = value
+    })
+
+    // CVV input formatting
+    const cvv = document.getElementById('cvv')
+    cvv.addEventListener('input', function (e) {
+        e.target.value = e.target.value.replace(/\D/g, '').substring(0,3)
+    })
+</script>
+{% endblock %}

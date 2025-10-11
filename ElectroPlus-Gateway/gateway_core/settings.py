@@ -46,6 +46,9 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
     'gateway_app',
+    'storefront',  # Frontend público global
+    'sales',      # Tienda y carrito
+    'inventory',  # Dashboard y gestión
 ]
 
 MIDDLEWARE = [
@@ -100,13 +103,24 @@ ROOT_URLCONF = 'gateway_core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR / 'gateway_app' / 'templates',
+            BASE_DIR / 'storefront' / 'templates',
+            BASE_DIR / 'sales' / 'templates',
+            BASE_DIR / 'inventory' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.media',
+                'django.template.context_processors.static',
+                'storefront.context_processors.cart',
+                'storefront.context_processors.categories',
             ],
         },
     },
@@ -161,6 +175,9 @@ USE_TZ = True
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'gateway_app' / 'static',
+    BASE_DIR / 'storefront' / 'static',
+    BASE_DIR / 'sales' / 'static',
+    BASE_DIR / 'inventory' / 'static',
 ]
 
 # Configuración de archivos estáticos para producción
