@@ -127,6 +127,21 @@ def home(request):
     }
     return render(request, 'storefront/shop/home.html', context)
 
+def category(request, slug):
+    """Vista de productos filtrados por categoría usando slug."""
+    # Obtener la categoría por slug
+    category_data = _call_inventario_service('categorias/')
+    if 'error' not in category_data:
+        categories = category_data if isinstance(category_data, list) else []
+        category = next((cat for cat in categories if cat['slug'] == slug), None)
+        if category:
+            request.GET = request.GET.copy()
+            request.GET['category_slug'] = slug
+            return product_list(request)
+    
+    messages.error(request, "Categoría no encontrada")
+    return redirect('storefront:products')
+
 def product_list(request):
     """Lista de todos los productos con filtros y ordenamiento."""
     
@@ -140,11 +155,13 @@ def product_list(request):
     params = {}
     
     # Filtro por categoría
-    category_id = request.GET.get('category')
-    if category_id:
-        params['categoria'] = category_id
+    category_slug = request.GET.get('category_slug')
+    if category_slug:
+        params['categoria_slug'] = category_slug
         # Obtener detalles de la categoría seleccionada
-        selected_category = next((cat for cat in categories if str(cat['id']) == str(category_id)), None)
+        selected_category = next((cat for cat in categories if cat['slug'] == category_slug), None)
+        if selected_category:
+            params['categoria'] = selected_category['id']  # Mantener compatibilidad con API
     else:
         selected_category = None
 
@@ -207,7 +224,7 @@ def product_list(request):
         'search_query': search_query,
         'is_ofertas': is_ofertas,
         'ordering': ordering,
-        'selected_category': category_id
+        'selected_category': selected_category
     }
     
     return render(request, 'storefront/shop/product_list.html', context)
@@ -286,9 +303,20 @@ def product_detail(request, slug):
 # para crear pedidos (Checkout) y consultar pedidos existentes (Profile/Orders).
 
 def category(request, slug):
-    """Vista de productos filtrados por categoría. Obtiene data de Inventario."""
-    # Simplemente redirigimos a la lista de productos con el filtro de categoría.
-    return redirect('storefront:products', category=slug)
+    """Vista de productos filtrados por categoría usando slug."""
+    # Obtener la categoría por slug
+    category_data = _call_inventario_service('categorias/')
+    if 'error' not in category_data:
+        categories = category_data if isinstance(category_data, list) else []
+        category = next((cat for cat in categories if cat['slug'] == slug), None)
+        if category:
+            # En lugar de redirigir, renderizamos directamente la lista con el filtro
+            request.GET = request.GET.copy()
+            request.GET['category_slug'] = slug
+            return product_list(request)
+    
+    messages.error(request, "Categoría no encontrada")
+    return redirect('storefront:products')
 
 def search(request):
     """Vista de resultados de búsqueda. Obtiene data de Inventario."""

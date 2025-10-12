@@ -33,7 +33,7 @@
         <div class="row g-4">
             {% for category in categories %}
             <div class="col-6 col-md-3">
-                <a href="{% url 'storefront:products' %}?category={{ category.id }}" class="text-decoration-none">
+                <a href="{% url 'storefront:category' slug=category.slug %}" class="text-decoration-none">
                     <div class="card h-100 category-card border-0 shadow-sm">
                         {% if category.imagen %}
                         <img src="{{ category.imagen }}" class="card-img-top" alt="{{ category.nombre }}" style="height: 150px; object-fit: cover;">
