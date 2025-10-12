@@ -1,12 +1,12 @@
 -- Datos de prueba para las tablas principales
 
 -- Insertar Categorías
-INSERT INTO Categorias (nombre, descripcion) VALUES
-('Electrodomésticos', 'Aparatos eléctricos para el hogar'),
-('Computadoras', 'Equipos de cómputo y accesorios'),
-('Smartphones', 'Teléfonos móviles inteligentes'),
-('Audio y Video', 'Equipos de entretenimiento'),
-('Gaming', 'Consolas y videojuegos');
+INSERT INTO Categorias (nombre, descripcion, slug) VALUES
+('Electrodomésticos', 'Aparatos eléctricos para el hogar', 'electrodomesticos'),
+('Computadoras', 'Equipos de cómputo y accesorios', 'computadoras'),
+('Smartphones', 'Teléfonos móviles inteligentes', 'smartphones'),
+('Audio y Video', 'Equipos de entretenimiento', 'audio-y-video'),
+('Gaming', 'Consolas y videojuegos', 'gaming');
 
 -- Insertar Proveedores
 INSERT INTO Proveedores (nombre, direccion, telefono, email) VALUES
@@ -17,12 +17,12 @@ INSERT INTO Proveedores (nombre, direccion, telefono, email) VALUES
 ('SmartTech', 'Calle Smart 654', '987654325', 'contacto@smarttech.com');
 
 -- Insertar Productos
-INSERT INTO Productos (nombre, descripcion, precio, stock, id_categoria, id_proveedor) VALUES
-('Laptop HP 15', 'Laptop HP 15.6" Core i5', 2499.99, 50, 2, 1),
-('Samsung Galaxy S21', 'Smartphone Samsung última generación', 3299.99, 30, 3, 5),
-('Smart TV LG 55"', 'Televisor LED Smart 4K', 2799.99, 25, 4, 2),
-('PlayStation 5', 'Consola de videojuegos', 2999.99, 20, 5, 4),
-('Refrigeradora Samsung', 'Refrigeradora No Frost 500L', 3499.99, 15, 1, 2);
+INSERT INTO Productos (nombre, descripcion, precio, stock, id_categoria, id_proveedor, slug) VALUES
+('Laptop HP 15', 'Laptop HP 15.6" Core i5', 2499.99, 50, 2, 1, 'laptop-hp-15'),
+('Samsung Galaxy S21', 'Smartphone Samsung última generación', 3299.99, 30, 3, 5, 'samsung-galaxy-s21'),
+('Smart TV LG 55"', 'Televisor LED Smart 4K', 2799.99, 25, 4, 2, 'smart-tv-lg-55'),
+('PlayStation 5', 'Consola de videojuegos', 2999.99, 20, 5, 4, 'playstation-5'),
+('Refrigeradora Samsung', 'Refrigeradora No Frost 500L', 3499.99, 15, 1, 2, 'refrigeradora-samsung');
 
 -- Insertar Usuarios
 INSERT INTO Usuarios (nombre_usuario, contrasena, rol) VALUES

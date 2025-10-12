@@ -1,5 +1,4 @@
 -- Creación de la base de datos para ElectroPlus S.A.C.
-CREATE DATABASE IF NOT EXISTS ElectroPlus;
 USE railway;
 
 -- -----------------------------------------------------
@@ -9,7 +8,9 @@ CREATE TABLE IF NOT EXISTS Categorias (
   id INT NOT NULL AUTO_INCREMENT,
   nombre VARCHAR(45) NOT NULL,
   descripcion TEXT NULL,
-  PRIMARY KEY (id)
+  slug VARCHAR(150) NULL,
+  PRIMARY KEY (id),
+  UNIQUE INDEX idx_categorias_slug (slug)
 );
 
 -- -----------------------------------------------------
@@ -35,7 +36,9 @@ CREATE TABLE IF NOT EXISTS Productos (
   stock INT NOT NULL,
   id_categoria INT NOT NULL,
   id_proveedor INT NOT NULL,
+  slug VARCHAR(150) NULL,
   PRIMARY KEY (id),
+  UNIQUE INDEX idx_productos_slug (slug),
   INDEX fk_producto_categoria_idx (id_categoria ASC),
   INDEX fk_producto_proveedor_idx (id_proveedor ASC),
   CONSTRAINT fk_producto_categoria
