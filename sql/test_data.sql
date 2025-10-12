@@ -115,7 +115,7 @@ INSERT INTO Productos (nombre, descripcion, precio, stock, id_categoria, id_prov
 ('RAM DDR5 64GB', 'Memoria RAM gaming RGB', 399.99, 15, 15, 6, 'ram-ddr5-64gb'),
 ('Laptop HP 15', 'Laptop HP 15.6" Core i5', 2499.99, 50, 2, 1, 'laptop-hp-15'),
 ('Samsung Galaxy S21', 'Smartphone Samsung última generación', 3299.99, 30, 3, 5, 'samsung-galaxy-s21'),
-('Smart TV LG 55"', 'Televisor LED Smart 4K', 2799.99, 25, 4, 2, 'smart-tv-lg-55'),
+('Smart TV LG 55', 'Televisor LED Smart 4K', 2799.99, 25, 4, 2, 'smart-tv-lg-55'),
 ('PlayStation 5', 'Consola de videojuegos', 2999.99, 20, 5, 4, 'playstation-5'),
 ('Refrigeradora Samsung', 'Refrigeradora No Frost 500L', 3499.99, 15, 1, 2, 'refrigeradora-samsung');
 
