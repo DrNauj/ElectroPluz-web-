@@ -158,7 +158,7 @@
         const quantity = document.getElementById('quantity').value;
         
         try {
-            const response = await fetch('/api/cart/add/', {
+            const response = await fetch('/carrito/agregar/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

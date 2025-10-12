@@ -16,7 +16,8 @@ urlpatterns = [
     # Dashboard y sus submódulos
     path('dashboard/', include('inventory.urls', namespace='dashboard')),
     
-    # Rutas de autenticación (login, register, logout, APIs, customer-dashboard)
+    # Rutas de autenticación
     path('auth/', include('gateway_app.urls')),
+    path('api/auth/', include('gateway_app.urls_auth')),
     
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

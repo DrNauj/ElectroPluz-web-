@@ -1,9 +1,85 @@
 // cart.js - Manejo del carrito de compras
+// Constantes para URLs de la API
+const API_URLS = {
+    ADD_TO_CART: '/api/cart/add/',
+    UPDATE_CART: '/api/cart/update/',
+    REMOVE_FROM_CART: '/api/cart/remove/',
+    GET_CART_COUNT: '/api/cart/count/',
+    GET_CART_TOTAL: '/api/cart/total/'
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar listeners a todos los botones de agregar al carrito
+    document.addEventListener('click', function(e) {
+        const button = e.target.closest('.add-to-cart-btn');
+        if (button) {
+            e.preventDefault();
+            const form = button.closest('.cart-add-form');
+            if (form) {
+                const productId = form.dataset.productId;
+                console.log('Adding to cart:', productId); // Debug
+                addToCart(productId, form);
+            }
+        }
+    });
+
+    // Inicializar tooltips y contador
+    initializeCart();
+});
+
+function initializeCart() {
+    // Inicializar tooltips de Bootstrap
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+
+    // Inicializar conteo del carrito
+    updateCartCount();
+}
+
+function updateCartCount() {
+    fetch(API_URLS.GET_CART_COUNT)
+        .then(response => response.json())
+        .then(data => {
+            console.log('Cart count response:', data); // Debug log
+            
+            // Actualizar todos los posibles contadores del carrito
+            ['#cart-counter', '#cartBadge', '#cartCounter'].forEach(selector => {
+                const counter = document.querySelector(selector);
+                if (counter) {
+                    counter.textContent = data.count || '0';
+                    // Manejar visibilidad
+                    if (counter.classList.contains('d-none')) {
+                        counter.classList.toggle('d-none', !data.count);
+                    } else if (counter.style.display) {
+                        counter.style.display = data.count ? 'block' : 'none';
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error updating cart count:', error);
+            // En caso de error, asumimos carrito vacío
+            const counter = document.querySelector('#cart-counter');
+            if (counter) {
+                counter.textContent = '0';
+                counter.classList.add('d-none');
+            }
+        });
+}
+
 function addToCart(productId, form = null) {
     const quantity = form ? form.querySelector('input[name="quantity"]').value : 1;
     const csrf_token = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
 
-    fetch('/api/cart/add/', {
+    console.log('Sending cart request:', {
+        productId,
+        quantity,
+        url: API_URLS.ADD_TO_CART
+    });
+
+    fetch(API_URLS.ADD_TO_CART, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -11,7 +87,7 @@ function addToCart(productId, form = null) {
         },
         body: JSON.stringify({
             product_id: productId,
-            quantity: quantity
+            quantity: parseInt(quantity)
         })
     })
     .then(response => response.json())

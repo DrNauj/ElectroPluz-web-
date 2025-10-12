@@ -41,6 +41,19 @@ class Cart:
         else:
             self.cart_id = cart_id
 
+    def _call_inventario_service(self, endpoint):
+        """Helper para llamar al servicio de inventario"""
+        try:
+            base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL']
+            headers = {'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']}
+            
+            response = requests.get(f"{base_url}/api/{endpoint}", headers=headers)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error calling inventario service: {e}")
+            return None
+
     def _get_auth_headers(self):
         """Devuelve los encabezados de autenticación si el usuario está logueado."""
         headers = {
@@ -96,22 +109,44 @@ class Cart:
     # --- Métodos de Interacción del Carrito ---
 
     def add(self, product_id, quantity=1, override_quantity=False):
-        """Agrega un producto al carrito o actualiza su cantidad a través del microservicio."""
-        if not self.cart_id:
-            logger.error("No hay ID de carrito disponible para agregar producto.")
+        """Agrega un producto al carrito o actualiza su cantidad."""
+        try:
+            # Obtener el carrito de la sesión o crear uno nuevo
+            cart = self.session.get('cart', {})
+            product_id_str = str(product_id)
+            
+            # Validar el producto con el servicio de inventario
+            product_data = self._call_inventario_service(f'productos/{product_id}/')
+            
+            if not product_data or 'error' in product_data:
+                logger.error(f"Error al obtener producto {product_id}: {product_data.get('error', 'Unknown error')}")
+                return False
+            
+            # Si el producto no está en el carrito, agregarlo
+            if product_id_str not in cart:
+                cart[product_id_str] = {
+                    'quantity': 0,
+                    'price': str(product_data['precio']),
+                    'name': product_data['nombre'],
+                    'image': product_data.get('imagen', ''),
+                }
+            
+            # Actualizar cantidad
+            if override_quantity:
+                cart[product_id_str]['quantity'] = quantity
+            else:
+                cart[product_id_str]['quantity'] += quantity
+                
+            # Guardar en sesión
+            self.session['cart'] = cart
+            self.session.modified = True
+            
+            logger.debug(f"Producto {product_id} agregado al carrito. Cantidad: {quantity}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error al agregar producto al carrito: {e}")
             return False
-        
-        data = {
-            'product_id': product_id,
-            'quantity': quantity,
-            'cart_id': self.cart_id,
-            'override_quantity': override_quantity
-        }
-        
-        # Endpoint: /api/carrito/items/agregar/ (debe manejar la lógica de sumar/reemplazar)
-        result = self._make_request('post', 'api/carrito/items/agregar/', data=data)
-        
-        return result is not None
 
     def remove(self, product_id):
         """Elimina un producto del carrito a través del microservicio."""
@@ -146,22 +181,37 @@ class Cart:
 
     def get_data(self):
         """
-        Obtiene el estado completo del carrito (items, totales) desde el microservicio.
-        Este es el único método que se llamará desde las vistas para obtener la información.
+        Obtiene el estado completo del carrito desde la sesión.
         """
-        if not self.cart_id:
-            return {'items': [], 'total_items': 0, 'subtotal': '0.00', 'total': '0.00'}
-
-        # Endpoint: /api/carrito/{cart_id}/
-        data = self._make_request('get', f'api/carrito/{self.cart_id}/')
-
-        # Si hay un error, devuelve datos vacíos
-        if data is None:
-            return {'items': [], 'total_items': 0, 'subtotal': '0.00', 'total': '0.00'}
+        cart = self.session.get('cart', {})
+        
+        items = []
+        total = 0
+        total_items = 0
+        
+        for product_id, item_data in cart.items():
+            quantity = item_data['quantity']
+            price = float(item_data['price'])
+            subtotal = quantity * price
             
-        # El microservicio debe devolver un diccionario que contenga 'items' (lista de productos en el carrito)
-        # 'total_items', 'subtotal', 'total', etc.
-        return data
+            items.append({
+                'id': product_id,
+                'nombre': item_data['name'],
+                'cantidad': quantity,
+                'precio': price,
+                'subtotal': subtotal,
+                'imagen': item_data.get('image', '')
+            })
+            
+            total += subtotal
+            total_items += quantity
+        
+        return {
+            'items': items,
+            'total_items': total_items,
+            'subtotal': f"{total:.2f}",
+            'total': f"{total:.2f}"
+        }
 
     def clear(self):
         """Vacía el carrito en el microservicio y elimina el ID de la sesión local."""

@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS Productos (
   nombre VARCHAR(100) NOT NULL,
   descripcion TEXT NULL,
   precio DECIMAL(10,2) NOT NULL,
+  precio_original DECIMAL(10,2) NULL,
+  descuento DECIMAL(5,2) NULL,
   stock INT NOT NULL,
   id_categoria INT NOT NULL,
   id_proveedor INT NOT NULL,

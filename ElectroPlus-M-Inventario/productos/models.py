@@ -48,6 +48,8 @@ class Producto(models.Model):
     id = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=100)
     descripcion = models.TextField(null=True, blank=True)
+    precio_original = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    descuento = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)  # Porcentaje de descuento
     precio = models.DecimalField(max_digits=10, decimal_places=2)
     stock = models.IntegerField()
     categoria = models.ForeignKey(

@@ -58,46 +58,48 @@
 
             <!-- Usuario y Carrito -->
             <div class="navbar-nav">
-                {% if user.is_authenticated %}
-                <div class="nav-item dropdown">
+                <!-- Elementos visibles solo para usuarios autenticados -->
+                <div class="nav-item dropdown" data-auth-required>
                     <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" 
                        data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-user"></i> {{ user.username }}
+                        <i class="fas fa-user"></i> <span id="currentUserName"></span>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
+                        <li data-role-required="cliente">
                             <a class="dropdown-item" href="{% url 'storefront:profile' %}">
                                 <i class="fas fa-user-circle me-2"></i> Mi Perfil
                             </a>
                         </li>
-                        <li>
+                        <li data-role-required="cliente">
                             <a class="dropdown-item" href="{% url 'storefront:orders' %}">
                                 <i class="fas fa-box me-2"></i> Mis Pedidos
                             </a>
                         </li>
-                        {% if user.is_staff %}
-                        <li>
+                        <!-- Elementos para empleados/admin -->
+                        <li data-role-required="empleado,admin">
+                            <a class="dropdown-item" href="/admin/dashboard/">
+                                <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                            </a>
+                        </li>
+                        <li data-role-required="admin">
                             <a class="dropdown-item" href="{% url 'admin:index' %}">
                                 <i class="fas fa-cog me-2"></i> Admin
                             </a>
                         </li>
-                        {% endif %}
                         <li><hr class="dropdown-divider"></li>
                         <li>
-                            <form action="{% url 'logout' %}" method="post">
-                                {% csrf_token %}
-                                <button type="submit" class="dropdown-item text-danger">
-                                    <i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión
-                                </button>
-                            </form>
+                            <button type="button" class="dropdown-item text-danger" data-action="logout">
+                                <i class="fas fa-sign-out-alt me-2"></i> Cerrar Sesión
+                            </button>
                         </li>
                     </ul>
                 </div>
-                {% else %}
-                <button class="btn btn-link nav-link" data-bs-toggle="modal" data-bs-target="#loginModal">
-                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
-                </button>
-                {% endif %}
+                <!-- Botón de inicio de sesión para usuarios no autenticados -->
+                <div class="nav-item" data-auth-hidden>
+                    <button class="btn btn-link nav-link" data-bs-toggle="modal" data-bs-target="#loginModal">
+                        <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                    </button>
+                </div>
 
 {% include 'storefront/account/modal_login.html' %}
 {% include 'storefront/account/notification.html' %}

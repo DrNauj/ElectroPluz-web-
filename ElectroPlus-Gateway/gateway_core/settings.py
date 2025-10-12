@@ -32,6 +32,17 @@ DEBUG = True
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# Configuración de Microservicios
+MICROSERVICES = {
+    'INVENTARIO': {
+        'BASE_URL': os.getenv('INVENTARIO_URL', 'http://localhost:8001'),
+        'API_KEY': os.getenv('INVENTARIO_API_KEY', 'your-api-key-here')
+    },
+    'VENTAS': {
+        'BASE_URL': os.getenv('VENTAS_URL', 'http://localhost:8002'),
+        'API_KEY': os.getenv('VENTAS_API_KEY', 'your-api-key-here')
+    }
+}
 
 # Application definition
 
@@ -85,6 +96,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'storefront.context_processors.categories.categories',  # Categorías para el navbar
             ],
         },
     },
@@ -188,6 +200,17 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 # URLs de redirección
 LOGIN_URL = '/auth/login/' # Usado por el decorador @login_required
 LOGIN_REDIRECT_URL = '/dashboard/'
+
+# Django REST Framework
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny',
+    ],
+}
 
 # Configuración específica para Django Debug Toolbar (DEBE ser eliminada/comentada si se quita el paquete)
 # INTERNAL_IPS = [

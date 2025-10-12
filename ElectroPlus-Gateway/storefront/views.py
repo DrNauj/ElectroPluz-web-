@@ -815,9 +815,39 @@ def terms(request):
 
 @require_POST
 def api_cart_add(request):
-    """API para agregar/actualizar productos del carrito (sesión local)."""
-    # Lógica de sesión similar a cart_add pero con JSON
-    return JsonResponse({'success': False, 'error': 'No implementado para API remota aún.'}, status=501)
+    """API para agregar/actualizar productos del carrito."""
+    try:
+        data = json.loads(request.body)
+        product_id = data.get('product_id')
+        quantity = int(data.get('quantity', 1))
+        
+        if not product_id:
+            return JsonResponse({'success': False, 'error': 'ID de producto requerido'}, status=400)
+            
+        # Obtener el carrito
+        cart = Cart(request)
+        
+        # Agregar al carrito
+        cart.add(product_id, quantity)
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Producto agregado al carrito',
+            'count': len(cart.get_data()['items'])
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Datos inválidos'}, status=400)
+    except Exception as e:
+        logger.error(f"Error al agregar al carrito: {e}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+def api_get_cart_count(request):
+    """API para obtener el número de items en el carrito."""
+    cart = Cart(request)
+    cart_data = cart.get_data()
+    count = sum(item['cantidad'] for item in cart_data['items'])
+    return JsonResponse({'count': count})
 
 @require_POST
 def api_cart_update(request):

@@ -8,6 +8,10 @@
     {% else %}Productos{% endif %} - ElectroPlus
 {% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'storefront/css/styles.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="container my-4">
     <!-- Breadcrumb -->
@@ -26,49 +30,51 @@
         </ol>
     </nav>
 
-    <!-- Filtros y Ordenamiento -->
-    <div class="row mb-4">
-        <div class="col-md-3">
-            <div class="card">
+    <!-- Contenedor principal de dos columnas -->
+    <div class="row">
+        <!-- Columna de Filtros (izquierda) -->
+        <div class="col-12 col-md-3 mb-4 mb-md-0">
+            <div class="card shadow-sm sticky-top" style="top: 20px; z-index: 1;">
                 <div class="card-body">
-                    <h5 class="card-title">Filtros</h5>
-                    <form method="get">
+                    <h5 class="card-title border-bottom pb-2">Filtros</h5>
+                    <form method="get" id="filterForm">
                         <!-- Categorías -->
                         {% if not categoria %}
-                        <div class="mb-3">
-                            <label class="form-label">Categorías</label>
-                            {% for cat in categories %}
-                            <div class="form-check">
+                        <div class="mb-4">
+                            <h6 class="form-label fw-bold">Categorías</h6>
+                            <div class="list-group list-group-flush">
+                                {% for cat in categories %}
                                 <a href="{% url 'storefront:category' slug=cat.slug %}" 
-                                   class="text-decoration-none">
-                                    <label class="form-check-label">
-                                        {{ cat.nombre }}
-                                    </label>
+                                   class="list-group-item list-group-item-action {% if categoria.id == cat.id %}active{% endif %}">
+                                    {{ cat.nombre }}
+                                    <span class="badge bg-secondary float-end">{{ cat.product_count }}</span>
                                 </a>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
                         </div>
                         {% endif %}
 
                         <!-- Rango de Precios -->
-                        <div class="mb-3">
-                            <label class="form-label">Precio</label>
+                        <div class="mb-4">
+                            <h6 class="form-label fw-bold">Rango de Precio</h6>
                             <div class="input-group mb-2">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text bg-light">$</span>
                                 <input type="number" class="form-control" name="min_price" 
-                                    placeholder="Min" value="{{ request.GET.min_price }}">
+                                    placeholder="Mínimo" value="{{ request.GET.min_price }}"
+                                    min="0" step="0.01">
                             </div>
                             <div class="input-group">
-                                <span class="input-group-text">$</span>
+                                <span class="input-group-text bg-light">$</span>
                                 <input type="number" class="form-control" name="max_price" 
-                                    placeholder="Max" value="{{ request.GET.max_price }}">
+                                    placeholder="Máximo" value="{{ request.GET.max_price }}"
+                                    min="0" step="0.01">
                             </div>
                         </div>
 
                         <!-- Ordenamiento -->
-                        <div class="mb-3">
-                            <label class="form-label">Ordenar por</label>
-                            <select class="form-select" name="ordering">
+                        <div class="mb-4">
+                            <h6 class="form-label fw-bold">Ordenar por</h6>
+                            <select class="form-select" name="ordering" id="orderingSelect">
                                 <option value="-fecha_creacion" {% if ordering == '-fecha_creacion' %}selected{% endif %}>Más recientes</option>
                                 <option value="precio" {% if ordering == 'precio' %}selected{% endif %}>Menor precio</option>
                                 <option value="-precio" {% if ordering == '-precio' %}selected{% endif %}>Mayor precio</option>
@@ -78,25 +84,59 @@
                             </select>
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100">Aplicar Filtros</button>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-filter me-2"></i>Aplicar Filtros
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
 
-        <!-- Lista de Productos -->
-        <div class="col-md-9">
+        <!-- Columna de Productos (derecha) -->
+        <div class="col-12 col-md-9">
             {% if products %}
-            <div class="row row-cols-1 row-cols-md-3 g-4">
+            <div class="products-grid">
                 {% for product in products %}
-                <div class="col">
+                <div class="product-item">
                     {% include "storefront/includes/product-card.html" with product=product %}
                 </div>
                 {% endfor %}
             </div>
 
             <!-- Paginación -->
-            {% if page_obj.has_other_pages %}
+            {% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Manejar cambios en el ordenamiento
+    const orderingSelect = document.getElementById('orderingSelect');
+    if (orderingSelect) {
+        orderingSelect.addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+    }
+
+    // Validar rango de precios
+    const minPriceInput = document.querySelector('input[name="min_price"]');
+    const maxPriceInput = document.querySelector('input[name="max_price"]');
+    
+    if (minPriceInput && maxPriceInput) {
+        minPriceInput.addEventListener('change', function() {
+            if (maxPriceInput.value && parseFloat(this.value) > parseFloat(maxPriceInput.value)) {
+                this.value = maxPriceInput.value;
+            }
+        });
+
+        maxPriceInput.addEventListener('change', function() {
+            if (minPriceInput.value && parseFloat(this.value) < parseFloat(minPriceInput.value)) {
+                this.value = minPriceInput.value;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% if page_obj.has_other_pages %}
             <nav class="mt-4">
                 <ul class="pagination justify-content-center">
                     {% if page_obj.has_previous %}

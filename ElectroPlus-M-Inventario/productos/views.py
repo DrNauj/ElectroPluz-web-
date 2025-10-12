@@ -80,7 +80,10 @@ class ProductoViewSet(viewsets.ModelViewSet):
         
         # Filtrar productos con descuento
         if con_descuento and con_descuento.lower() == 'true':
-            queryset = queryset.filter(precio_original__isnull=False, precio__lt=models.F('precio_original'))
+            queryset = queryset.filter(
+                models.Q(descuento__isnull=False) & models.Q(descuento__gt=0) |
+                models.Q(precio_original__isnull=False) & models.Q(precio__lt=models.F('precio_original'))
+            )
         
         # Aplicar ordenamiento
         if ordering:
