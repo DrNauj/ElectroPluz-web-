@@ -7,12 +7,14 @@ from django.db.models import Q
 from django.conf import settings
 from django.contrib import messages # Para mostrar mensajes de error al usuario
 from gateway_app.forms import ProfileForm, CheckoutForm
-# Ya no necesitamos importar modelos locales como Product, Category, etc., 
-# ya que la data viene del microservicio.
+from gateway_app.models import Product, Category, Order, OrderItem, Profile
+from gateway_app.forms import ProfileForm, CheckoutForm
+from django.conf import settings # Importar settings
 import requests
 import json
 import logging
 from decimal import Decimal 
+from .cart import Cart 
 
 logger = logging.getLogger(__name__)
 
@@ -50,29 +52,44 @@ def _call_inventario_service(endpoint, params=None):
 
 
 def home(request):
-    """Vista de la página principal. Obtiene categorías y productos destacados de Inventario."""
-    
-    # 1. Obtener categorías
-    categories = []
-    category_data = _call_inventario_service('categorias/')
-    if 'error' not in category_data:
-        categories = category_data.get('results', []) if isinstance(category_data, dict) else category_data
-    
-    # 2. Obtener productos destacados
-    featured_products = []
-    # Solicitamos los productos más recientes por ahora
-    featured_params = {
-        'limit': 8,
-        'ordering': '-id'  # Ordenar por más recientes
-    }
-    featured_products_data = _call_inventario_service('productos/', params=featured_params)
-    if 'error' not in featured_products_data:
-        featured_products = featured_products_data.get('results', [])
-    
+    """Vista de la página principal, obtiene productos destacados del MS-Inventario."""
+    categories = Category.objects.all()
+    featured_products = [] # Inicializar como lista vacía por defecto
+
+    try:
+        # URL para obtener productos destacados (asumiendo que el MS tiene un endpoint para esto)
+        # O usar el endpoint de lista y filtrar: /api/productos/?featured=true&limit=8
+        inventory_url = f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/productos/?featured=true&limit=8"
+
+        response = requests.get(
+            inventory_url,
+            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']},
+            timeout=5
+        )
+        
+        # Manejo de la respuesta
+        if response.status_code == 200:
+            featured_products_data = response.json()
+            
+            # --- CORRECCIÓN CLAVE ---
+            # Verificar si la respuesta JSON es un diccionario antes de usar .get()
+            if isinstance(featured_products_data, dict):
+                # Extraer la lista de productos de la clave 'results' (asumiendo paginación DRF)
+                featured_products = featured_products_data.get('results', [])
+            else:
+                # Si no es un diccionario, logueamos el error y dejamos featured_products como lista vacía
+                logger.error(f"MS-Inventario devolvió datos inesperados (no-diccionario) para destacados: {featured_products_data}")
+                featured_products = [] # Asegurar que es una lista
+        else:
+            logger.warning(f"Error al obtener productos destacados del MS-Inventario. Status: {response.status_code}")
+
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error de conexión al obtener productos destacados: {str(e)}")
+        # featured_products se mantiene como lista vacía
+
     context = {
         'categories': categories,
-        'featured_products': featured_products,
-        'active_coupons': []  # Por ahora no tenemos cupones
+        'featured_products': featured_products, # featured_products es ahora garantizado como lista
     }
     return render(request, 'storefront/home.html', context)
 
@@ -182,44 +199,40 @@ def ofertas(request):
 # carrito persistente en el Microservicio de Ventas, pero requieren un endpoint específico.
 
 def cart(request):
-    """Muestra el contenido del carrito."""
-    # Aquí se debería llamar a la API de Ventas para obtener el carrito persistente
-    # o usar la lógica local de sesión. Mantenemos la lógica de sesión por ahora.
-    # Necesitaríamos importar la clase Cart o usar la sesión directamente.
+    """Muestra el contenido del carrito de compras."""
+    # 1. Instanciar el objeto Cart usando la sesión del request
+    cart_obj = Cart(request)
     
-    # Como la clase Cart no es local de storefront, necesitamos una implementación ligera aquí
-    # o asumir que la clase Cart de sales se usará. Por la estructura, asumimos que se usa
-    # un sistema de carrito basado en la sesión de Django simple (diccionario en request.session['cart']).
-    
-    cart_data = request.session.get('cart', {})
-    
-    # Obtener detalles de productos (Necesita llamar a Inventario para cada producto en el carrito)
-    cart_items = []
-    total = Decimal('0.00')
-    
-    for product_id, item_data in cart_data.items():
-        # Llamada a Inventario para obtener detalles del producto
-        # Asumimos un endpoint para obtener un producto por ID
-        product_detail_data = _call_inventario_service(f'productos/id/{product_id}/')
+    # 2. Obtener el formulario de checkout (se puede necesitar en esta misma página)
+    # Si el usuario está autenticado, intentar pre-llenar el formulario.
+    if request.user.is_authenticated:
+        try:
+            profile = request.user.profile
+            initial_data = {
+                'shipping_name': profile.user.get_full_name() or profile.user.username,
+                'shipping_address': profile.address,
+                'shipping_city': profile.city,
+                'shipping_state': profile.state,
+                'shipping_zip': profile.zip_code,
+                'shipping_country': profile.country,
+                'email': profile.user.email,
+                'phone': profile.phone,
+            }
+            form = CheckoutForm(initial=initial_data)
+        except Profile.DoesNotExist:
+             form = CheckoutForm()
+    else:
+        form = CheckoutForm()
 
-        if 'error' not in product_detail_data:
-            product = product_detail_data
-            price = Decimal(str(item_data['price']))
-            quantity = item_data['quantity']
-            item_total = price * quantity
-            total += item_total
-            cart_items.append({
-                'product': product,
-                'quantity': quantity,
-                'price': price,
-                'total_price': item_total
-            })
-            
     context = {
-        'cart_items': cart_items,
-        'cart_total': total,
+        'cart': cart_obj,
+        'checkout_form': form, # El formulario de checkout también puede ser útil aquí
+        'categories': Category.objects.filter(active=True),
     }
-    return render(request, 'storefront/cart.html', context)
+    
+    # El traceback indica que faltaba 'storefront/cart.html'.
+    # Si existe 'storefront/templates/shop/cart.html', esto funcionará.
+    return render(request, 'storefront/shop/cart.html', context)
 
 
 # Las vistas de API para carrito (api_cart_add, api_cart_remove, etc.) también están
