@@ -1,51 +1,68 @@
 {% load static %}
 
-<div class="card product-card h-100">
-    {% if product.imagen %}
-    <img src="{{ product.imagen.url }}" class="card-img-top" alt="{{ product.nombre }}">
-    {% else %}
-    <img src="{% static 'img/no-image.png' %}" class="card-img-top" alt="No imagen">
-    {% endif %}
-    
-    <div class="card-body d-flex flex-column">
-        <h5 class="card-title">{{ product.nombre }}</h5>
-        <p class="card-text text-muted">{{ product.categoria.nombre }}</p>
-        <p class="card-text">{{ product.descripcion|truncatechars:100 }}</p>
+<div class="card product-card h-100 position-relative">
+    <a href="{% url 'storefront:product' product.slug %}" class="text-decoration-none stretched-link">
+        {% if product.imagen %}
+        <img src="{{ product.imagen.url }}" class="card-img-top" alt="{{ product.nombre }}" style="height: 200px; object-fit: cover;">
+        {% else %}
+        <img src="{% static 'img/no-image.png' %}" class="card-img-top" alt="No imagen" style="height: 200px; object-fit: contain;">
+        {% endif %}
         
-        <div class="mt-auto">
-            <div class="d-flex justify-content-between align-items-center">
-                <div class="price-info">
-                    <h5 class="mb-0">${{ product.precio }}</h5>
-                    {% if product.descuento > 0 %}
-                    <small class="text-muted text-decoration-line-through">${{ product.precio_original }}</small>
-                    <span class="badge bg-danger">-{{ product.descuento }}%</span>
-                    {% endif %}
-                </div>
-                
-                <div class="stock-info">
-                    {% if product.stock > 0 %}
-                    <span class="badge bg-success">En Stock</span>
-                    {% else %}
-                    <span class="badge bg-danger">Agotado</span>
-                    {% endif %}
-                </div>
-            </div>
+        <div class="card-body d-flex flex-column">
+            <h5 class="card-title text-dark">{{ product.nombre }}</h5>
+            <p class="card-text text-muted">{{ product.categoria.nombre }}</p>
+            <p class="card-text text-muted text-truncate-2">{{ product.descripcion|truncatechars:100 }}</p>
             
-            <div class="mt-3">
-                {% if product.stock > 0 %}
-                <form method="post" action="{% url 'add_to_cart' product.id %}" class="d-flex gap-2">
-                    {% csrf_token %}
-                    <input type="number" name="quantity" value="1" min="1" max="{{ product.stock }}" class="form-control form-control-sm" style="width: 70px">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-cart-plus"></i> Agregar
-                    </button>
-                </form>
-                {% else %}
-                <button class="btn btn-secondary w-100" disabled>
-                    <i class="fas fa-clock"></i> Notificarme
-                </button>
-                {% endif %}
+            <div class="mt-auto">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="price-info">
+                        <h5 class="mb-0 text-primary">${{ product.precio }}</h5>
+                        {% if product.descuento > 0 %}
+                        <small class="text-muted text-decoration-line-through">${{ product.precio_original }}</small>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="stock-info">
+                        {% if product.stock > 0 %}
+                        <span class="badge bg-success">En Stock</span>
+                        {% else %}
+                        <span class="badge bg-danger">Agotado</span>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
+        </div>
+    </a>
+    
+    {% if product.descuento > 0 %}
+    <div class="position-absolute top-0 start-0 p-2">
+        <span class="badge bg-danger">-{{ product.descuento }}%</span>
+    </div>
+    {% endif %}
+
+    {% if product.stock > 0 %}
+    <div class="position-absolute bottom-0 start-0 end-0 p-3 bg-white border-top" style="z-index: 2;">
+        <form method="post" action="{% url 'storefront:cart_add' %}" 
+              class="d-flex gap-2"
+              onsubmit="event.preventDefault(); addToCart({{ product.id }}, this);">
+            {% csrf_token %}
+            <input type="hidden" name="product_id" value="{{ product.id }}">
+            <input type="number" name="quantity" value="1" min="1" max="{{ product.stock }}" 
+                   class="form-control form-control-sm" style="width: 70px"
+                   onclick="event.stopPropagation();"
+                   onchange="event.stopPropagation();">
+            <button type="submit" class="btn btn-primary flex-grow-1">
+                <i class="fas fa-cart-plus"></i> Agregar
+            </button>
+        </form>
+    </div>
+    {% else %}
+    <div class="position-absolute bottom-0 start-0 end-0 p-3 bg-white border-top">
+        <button class="btn btn-secondary w-100" disabled>
+            Agotado
+        </button>
+    </div>
+    {% endif %}
         </div>
     </div>
 </div>

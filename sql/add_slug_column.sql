@@ -1,0 +1,1 @@
+ALTER TABLE `Productos` ADD `slug` varchar(150), ADD UNIQUE INDEX `idx_productos_slug` (`slug`);

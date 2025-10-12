@@ -6,7 +6,7 @@ from .serializers_cupones import CuponSerializer, UsoCuponSerializer
 class CategoriaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Categoria
-        fields = ['id', 'nombre', 'descripcion']
+        fields = ['id', 'nombre', 'descripcion', 'slug']
 
 
 class ProveedorSerializer(serializers.ModelSerializer):
@@ -35,7 +35,8 @@ class ProductoSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'nombre', 'descripcion', 'precio', 'stock',
             'categoria', 'categoria_nombre',
-            'proveedor', 'proveedor_nombre'
+            'proveedor', 'proveedor_nombre',
+            'slug'
         ]
 
     def validate(self, data):
@@ -72,9 +73,20 @@ class ProductoDetalladoSerializer(ProductoSerializer):
     categoria = CategoriaSerializer(read_only=True)
     proveedor = ProveedorSerializer(read_only=True)
     historial = serializers.SerializerMethodField()
+    especificaciones = serializers.SerializerMethodField()
+    precio_original = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
 
     class Meta(ProductoSerializer.Meta):
-        fields = ProductoSerializer.Meta.fields + ['categoria', 'proveedor', 'historial']
+        fields = [
+            'id', 'nombre', 'descripcion', 'precio', 'precio_original',
+            'stock', 'categoria', 'categoria_nombre', 'proveedor',
+            'proveedor_nombre', 'slug', 'historial', 'especificaciones'
+        ]
+    
+    def get_especificaciones(self, obj):
+        # Este método puede personalizarse según cómo almacenas las especificaciones
+        # Por ahora retornamos un diccionario vacío
+        return {}
 
     def get_historial(self, obj):
         # Usar el campo correcto 'fecha' del modelo HistorialInventario

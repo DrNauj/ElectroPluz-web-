@@ -42,12 +42,18 @@
             </ul>
 
             <!-- Búsqueda -->
-            <form class="d-flex me-3" action="{% url 'storefront:search' %}" method="GET">
-                <input class="form-control me-2" type="search" name="q" placeholder="Buscar productos..."
-                       value="{{ request.GET.q|default:'' }}">
-                <button class="btn btn-outline-light" type="submit">
-                    <i class="fas fa-search"></i>
-                </button>
+            <form class="d-flex me-3" action="{% url 'storefront:products' %}" method="GET">
+                <div class="input-group">
+                    <input class="form-control" type="search" name="search" placeholder="Buscar productos..."
+                           value="{{ request.GET.search|default:'' }}" autocomplete="off"
+                           data-bs-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-outline-light" type="submit">
+                        <i class="fas fa-search"></i>
+                    </button>
+                    <!-- Dropdown de sugerencias -->
+                    <ul class="dropdown-menu dropdown-menu-end w-100" id="searchSuggestions">
+                    </ul>
+                </div>
             </form>
 
             <!-- Usuario y Carrito -->

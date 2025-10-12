@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.utils import timezone
 from django.conf import settings
+from django.db import models
 from .models import Categoria, Proveedor, Producto, HistorialInventario
 from .serializers import (
     CategoriaSerializer, ProveedorSerializer,
@@ -33,8 +34,65 @@ class ProductoViewSet(viewsets.ModelViewSet):
     ViewSet para gestionar productos.
     Permite operaciones CRUD completas y manejo especial del stock.
     """
-    queryset = Producto.objects.all()
+    queryset = Producto.objects.all().select_related('categoria', 'proveedor')
     serializer_class = ProductoSerializer
+    lookup_field = 'slug'
+    lookup_url_kwarg = 'slug'
+
+    def retrieve(self, request, *args, **kwargs):
+        """Sobreescribir retrieve para manejar búsqueda por slug."""
+        try:
+            instance = self.get_object()
+            serializer = ProductoDetalladoSerializer(instance)
+            return Response(serializer.data)
+        except Exception as e:
+            return Response(
+                {'error': f'No se encontró el producto: {str(e)}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+    
+    def get_queryset(self):
+        """Personalizar el queryset base con filtros y búsqueda."""
+        queryset = super().get_queryset()
+        
+        # Obtener parámetros de consulta
+        busqueda = self.request.query_params.get('busqueda', None)
+        categoria = self.request.query_params.get('categoria', None)
+        precio_min = self.request.query_params.get('precio_min', None)
+        precio_max = self.request.query_params.get('precio_max', None)
+        con_descuento = self.request.query_params.get('con_descuento', None)
+        ordering = self.request.query_params.get('ordering', None)
+        exclude = self.request.query_params.get('exclude', None)
+        
+        # Aplicar búsqueda por nombre o descripción
+        if busqueda:
+            queryset = queryset.filter(nombre__icontains=busqueda) | queryset.filter(descripcion__icontains=busqueda)
+        
+        # Filtrar por categoría
+        if categoria:
+            queryset = queryset.filter(categoria_id=categoria)
+        
+        # Filtrar por rango de precios
+        if precio_min:
+            queryset = queryset.filter(precio__gte=float(precio_min))
+        if precio_max:
+            queryset = queryset.filter(precio__lte=float(precio_max))
+        
+        # Filtrar productos con descuento
+        if con_descuento and con_descuento.lower() == 'true':
+            queryset = queryset.filter(precio_original__isnull=False, precio__lt=models.F('precio_original'))
+        
+        # Aplicar ordenamiento
+        if ordering:
+            if ordering.startswith('-'):
+                field = ordering[1:]
+                if hasattr(Producto, field):
+                    queryset = queryset.order_by(ordering)
+            else:
+                if hasattr(Producto, ordering):
+                    queryset = queryset.order_by(ordering)
+        
+        return queryset
 
     def get_serializer_class(self):
         if self.action == 'retrieve':

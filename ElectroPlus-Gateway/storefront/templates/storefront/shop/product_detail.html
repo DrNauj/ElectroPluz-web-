@@ -1,4 +1,4 @@
-{% extends "storefront/base.html" %}
+{% extends "storefront/base/base.html" %}
 {% load static %}
 
 {% block title %}{{ product.nombre }} - ElectroPlus{% endblock %}
@@ -29,9 +29,9 @@
         <div class="col-md-6">
             <nav aria-label="breadcrumb" class="mb-3">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'home' %}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'storefront:home' %}">Inicio</a></li>
                     {% if product.categoria %}
-                    <li class="breadcrumb-item"><a href="{% url 'category_products' product.categoria.slug %}">{{ product.categoria.nombre }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'storefront:category' product.categoria.slug %}">{{ product.categoria.nombre }}</a></li>
                     {% endif %}
                     <li class="breadcrumb-item active">{{ product.nombre }}</li>
                 </ol>
@@ -97,7 +97,7 @@
                     <div class="card-body">
                         <h5 class="card-title text-truncate">{{ related.nombre }}</h5>
                         <p class="card-text">${{ related.precio }}</p>
-                        <a href="{% url 'product_detail' related.id %}" class="btn btn-outline-primary btn-sm">Ver Detalles</a>
+                        <a href="{% url 'storefront:product' related.slug %}" class="btn btn-outline-primary btn-sm">Ver Detalles</a>
                     </div>
                 </div>
             </div>

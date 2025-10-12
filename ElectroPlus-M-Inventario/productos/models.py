@@ -1,10 +1,12 @@
 from django.db import models
+from django.utils.text import slugify
 from .models_cupones import Cupon, UsoCupon
 
 class Categoria(models.Model):
     id = models.AutoField(primary_key=True)
     nombre = models.CharField(max_length=45)
     descripcion = models.TextField(null=True, blank=True)
+    slug = models.SlugField(max_length=50, unique=True, blank=True)
 
     class Meta:
         db_table = 'Categorias'
@@ -14,6 +16,17 @@ class Categoria(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.nombre)
+            # Asegurar que el slug sea único
+            counter = 1
+            original_slug = self.slug
+            while Categoria.objects.filter(slug=self.slug).exists():
+                self.slug = f"{original_slug}-{counter}"
+                counter += 1
+        super().save(*args, **kwargs)
 
 class Proveedor(models.Model):
     id = models.AutoField(primary_key=True)
@@ -47,6 +60,18 @@ class Producto(models.Model):
         on_delete=models.PROTECT,
         db_column='id_proveedor'
     )
+    slug = models.SlugField(max_length=150, unique=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.nombre)
+            # Asegurar que el slug sea único
+            counter = 1
+            original_slug = self.slug
+            while Producto.objects.filter(slug=self.slug).exists():
+                self.slug = f"{original_slug}-{counter}"
+                counter += 1
+        super().save(*args, **kwargs)
 
     class Meta:
         db_table = 'Productos'

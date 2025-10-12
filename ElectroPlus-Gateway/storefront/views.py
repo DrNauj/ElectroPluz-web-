@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.conf import settings
 from django.contrib import messages # Para mostrar mensajes de error al usuario
+from django.urls import reverse
 from gateway_app.forms import ProfileForm, CheckoutForm
 from gateway_app.models import Product, Category, Order, OrderItem, Profile
 from gateway_app.forms import ProfileForm, CheckoutForm
@@ -26,8 +27,15 @@ def _call_inventario_service(endpoint, params=None):
     """
     base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL'].rstrip('/')
     api_key = settings.MICROSERVICES['INVENTARIO']['API_KEY']
-    # Usar el endpoint con prefijo 'api/'
-    url = f"{base_url}/api/{endpoint}"
+    
+    # Normalizar el endpoint
+    endpoint = endpoint.strip('/')
+    url = f"{base_url}/api/{endpoint}/"
+    
+    # Debug logging
+    logger.debug(f"Calling inventario service: {url}")
+    if params:
+        logger.debug(f"With params: {params}")
     
     headers = {
         'X-API-Key': api_key,
@@ -52,121 +60,223 @@ def _call_inventario_service(endpoint, params=None):
 
 
 def home(request):
-    """Vista de la página principal, obtiene productos destacados del MS-Inventario."""
-    categories = Category.objects.all()
-    featured_products = [] # Inicializar como lista vacía por defecto
-
-    try:
-        # URL para obtener productos destacados (asumiendo que el MS tiene un endpoint para esto)
-        # O usar el endpoint de lista y filtrar: /api/productos/?featured=true&limit=8
-        inventory_url = f"{settings.MICROSERVICES['INVENTARIO']['BASE_URL']}api/productos/?featured=true&limit=8"
-
-        response = requests.get(
-            inventory_url,
-            headers={'X-API-Key': settings.MICROSERVICES['INVENTARIO']['API_KEY']},
-            timeout=5
-        )
-        
-        # Manejo de la respuesta
-        if response.status_code == 200:
-            featured_products_data = response.json()
-            
-            # --- CORRECCIÓN CLAVE ---
-            # Verificar si la respuesta JSON es un diccionario antes de usar .get()
-            if isinstance(featured_products_data, dict):
-                # Extraer la lista de productos de la clave 'results' (asumiendo paginación DRF)
-                featured_products = featured_products_data.get('results', [])
-            else:
-                # Si no es un diccionario, logueamos el error y dejamos featured_products como lista vacía
-                logger.error(f"MS-Inventario devolvió datos inesperados (no-diccionario) para destacados: {featured_products_data}")
-                featured_products = [] # Asegurar que es una lista
+    """Vista de la página principal. Obtiene categorías y productos destacados de Inventario."""
+    
+    # 1. Obtener categorías
+    categories = []
+    category_data = _call_inventario_service('categorias/')
+    if 'error' not in category_data:
+        categories = category_data if isinstance(category_data, list) else []
+    
+    # 2. Obtener productos destacados
+    featured_products = []
+    # Obtener productos con descuento primero
+    featured_params = {
+        'con_descuento': 'true',
+        'limit': 4,
+        'ordering': '-descuento'
+    }
+    featured_discounted = _call_inventario_service('productos/', params=featured_params)
+    if 'error' not in featured_discounted:
+        if isinstance(featured_discounted, dict):
+            featured_products.extend(featured_discounted.get('results', []))
         else:
-            logger.warning(f"Error al obtener productos destacados del MS-Inventario. Status: {response.status_code}")
+            featured_products.extend(featured_discounted[:4])
+    
+    # Si no hay suficientes productos con descuento, agregar productos recientes
+    if len(featured_products) < 8:
+        recent_params = {
+            'limit': 8 - len(featured_products),
+            'ordering': '-id'
+        }
+        recent_products = _call_inventario_service('productos/', params=recent_params)
+        if 'error' not in recent_products:
+            if isinstance(recent_products, dict):
+                featured_products.extend(recent_products.get('results', []))
+            else:
+                featured_products.extend(recent_products)
+    
+    # 3. Obtener cupones activos
+    active_coupons = []
+    try:
+        coupons_data = _call_inventario_service('cupones/', params={'activo': 'true', 'limit': 3})
+        if 'error' not in coupons_data:
+            active_coupons = coupons_data if isinstance(coupons_data, list) else []
+    except Exception as e:
+        logger.error(f"Error al obtener cupones: {e}")
 
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error de conexión al obtener productos destacados: {str(e)}")
-        # featured_products se mantiene como lista vacía
+    # 4. Obtener productos recién llegados para el carrusel
+    new_arrivals = []
+    new_params = {
+        'limit': 5,
+        'ordering': '-id'
+    }
+    new_products = _call_inventario_service('productos/', params=new_params)
+    if 'error' not in new_products:
+        if isinstance(new_products, dict):
+            new_arrivals = new_products.get('results', [])
+        else:
+            new_arrivals = new_products[:5]
 
     context = {
         'categories': categories,
-        'featured_products': featured_products, # featured_products es ahora garantizado como lista
+        'featured_products': featured_products,
+        'active_coupons': active_coupons,
+        'new_arrivals': new_arrivals,
+        'current_section': 'home'  # Para marcar el enlace activo en el navbar
     }
-    return render(request, 'storefront/home.html', context)
+    return render(request, 'storefront/shop/home.html', context)
 
 def product_list(request):
-    """Lista de todos los productos con filtros y ordenamiento. Obtiene datos de Inventario."""
+    """Lista de todos los productos con filtros y ordenamiento."""
     
-    # Parámetros para la API de Inventario
-    params = {
-        'page': request.GET.get('page', 1),
-        'categoria': request.GET.get('category'),  # ID de la categoría
-        'min_price': request.GET.get('min_price'),
-        'max_price': request.GET.get('max_price'),
-        'search': request.GET.get('search'),  # Soporte para búsqueda
-        'ordering': request.GET.get('ordering', '-fecha_creacion'),  # Ordenamiento
-        'active_coupon': request.GET.get('active_coupon'),  # Filtrar por cupones activos
-    }
+    # Obtener todas las categorías para el filtro
+    categories = []
+    category_data = _call_inventario_service('categorias/')
+    if 'error' not in category_data:
+        categories = category_data if isinstance(category_data, list) else []
 
-    # Obtener la categoría seleccionada si existe
-    selected_category = None
-    if params['categoria']:
-        categoria_data = _call_inventario_service(f'categorias/{params["categoria"]}/')
-        if 'error' not in categoria_data:
-            selected_category = categoria_data
+    # Preparar parámetros de filtrado
+    params = {}
     
-    # Limpiar parámetros vacíos
-    params = {k: v for k, v in params.items() if v}
-    
-    # Llama al microservicio
+    # Filtro por categoría
+    category_id = request.GET.get('category')
+    if category_id:
+        params['categoria'] = category_id
+        # Obtener detalles de la categoría seleccionada
+        selected_category = next((cat for cat in categories if str(cat['id']) == str(category_id)), None)
+    else:
+        selected_category = None
+
+    # Filtros de precio
+    min_price = request.GET.get('min_price')
+    max_price = request.GET.get('max_price')
+    if min_price:
+        params['precio_min'] = min_price
+    if max_price:
+        params['precio_max'] = max_price
+
+    # Búsqueda
+    search_query = request.GET.get('search')
+    if search_query:
+        params['busqueda'] = search_query
+
+    # Ordenamiento
+    ordering = request.GET.get('ordering', '-id')
+    if ordering:
+        params['ordering'] = ordering
+
+    # Filtro de ofertas
+    is_ofertas = request.GET.get('active_coupon') == 'true'
+    if is_ofertas:
+        params['con_descuento'] = 'true'
+
+    # Paginación
+    page = request.GET.get('page', 1)
+    params['page'] = page
+    params['page_size'] = 12  # productos por página
+
+    # Obtener productos
     product_data = _call_inventario_service('productos/', params=params)
-    categories = _call_inventario_service('categorias/')
-
+    
     if 'error' in product_data:
         messages.error(request, product_data['error'])
         products = []
-        paginator = Paginator([], 12)
-        page_obj = paginator.get_page(1)
+        total_pages = 1
+        current_page = 1
     else:
-        # El microservicio debe devolver la paginación de DRF
-        products = product_data.get('results', [])
-        # Simulamos la paginación de Django con los datos recibidos (idealmente el microservicio la manejaría)
-        paginator = Paginator(products, 12) # 12 productos por página
-        page_obj = paginator.get_page(request.GET.get('page'))
-    
+        if isinstance(product_data, dict):
+            products = product_data.get('results', [])
+            total_count = product_data.get('count', 0)
+            current_page = product_data.get('current_page', 1)
+            total_pages = -(-total_count // 12)  # Ceiling division
+        else:
+            products = product_data
+            total_pages = 1
+            current_page = 1
+
+    # Crear objeto de paginación
+    paginator = Paginator(range(total_pages * 12), 12)
+    page_obj = paginator.get_page(current_page)
+
     context = {
+        'products': products,
         'page_obj': page_obj,
-        'products': page_obj.object_list,
-        'categories': categories if isinstance(categories, list) else [],
+        'categories': categories,
         'categoria': selected_category,
-        'search_query': request.GET.get('search'),
-        'is_ofertas': request.GET.get('active_coupon') == 'true',
-        'ordering': request.GET.get('ordering', '-fecha_creacion'),
-        'selected_category': params['categoria']
+        'search_query': search_query,
+        'is_ofertas': is_ofertas,
+        'ordering': ordering,
+        'selected_category': category_id
     }
+    
     return render(request, 'storefront/shop/product_list.html', context)
 
 def product_detail(request, slug):
-    """Detalle de un producto. Obtiene datos de Inventario por slug."""
+    """Detalle de un producto y sus productos relacionados."""
     
-    # Llama al microservicio para obtener un producto por SLUG
-    product_data = _call_inventario_service(f'productos/{slug}/')
-    
-    if 'error' in product_data:
-        # En caso de error (incluido 404), mostramos mensaje y redirigimos o mostramos error
-        messages.error(request, product_data['error'])
-        # Considerar si redirigir a la lista de productos o renderizar 404
+    try:
+        # 1. Obtener detalles del producto
+        logger.debug(f"Buscando producto con slug: {slug}")
+        product_data = _call_inventario_service(f'productos/{slug}')
+        
+        if isinstance(product_data, dict):
+            if 'error' in product_data:
+                logger.error(f"Error al obtener producto {slug}: {product_data['error']}")
+                messages.error(request, "Lo sentimos, no pudimos encontrar el producto solicitado.")
+                return redirect('storefront:products')
+                
+            # Verificar que tengamos los campos necesarios
+            required_fields = ['id', 'nombre', 'precio', 'stock']
+            if not all(field in product_data for field in required_fields):
+                logger.error(f"Datos incompletos para el producto {slug}")
+                messages.error(request, "Lo sentimos, los datos del producto están incompletos.")
+                return redirect('storefront:products')
+        else:
+            logger.error(f"Respuesta inesperada para el producto {slug}")
+            messages.error(request, "Lo sentimos, ocurrió un error al cargar el producto.")
+            return redirect('storefront:products')
+    except Exception as e:
+        logger.error(f"Error al procesar la solicitud para el producto {slug}: {str(e)}")
+        messages.error(request, "Lo sentimos, ocurrió un error al procesar su solicitud.")
         return redirect('storefront:products')
         
-    product = product_data # Asumimos que el microservicio devuelve el objeto directamente
+    product = product_data
     
-    # Aseguramos que el precio sea de tipo Decimal si se usa en cálculos de plantilla
-    if product.get('price'):
-        product['price'] = Decimal(str(product['price']))
+    # Asegurar tipos de datos correctos
+    if 'precio' in product:
+        product['precio'] = Decimal(str(product['precio']))
+    if 'precio_original' in product:
+        product['precio_original'] = Decimal(str(product['precio_original']))
+    
+    # 2. Obtener productos relacionados (de la misma categoría)
+    related_products = []
+    if product.get('categoria', {}).get('id'):
+        try:
+            params = {
+                'categoria': product['categoria']['id'],
+                'exclude': product['id'],  # No incluir el producto actual
+                'limit': 4  # Limitar a 4 productos relacionados
+            }
+            related_data = _call_inventario_service('productos', params=params)
+            if isinstance(related_data, dict) and 'results' in related_data:
+                related_products = related_data['results'][:4]
+                
+                # Asegurar que los productos relacionados tengan todos los campos necesarios
+                related_products = [
+                    prod for prod in related_products 
+                    if all(field in prod for field in ['id', 'nombre', 'precio', 'slug'])
+                ]
+        except Exception as e:
+            logger.warning(f"Error al obtener productos relacionados: {str(e)}")
+            # No enviamos mensaje de error al usuario ya que esto no es crítico
 
     context = {
         'product': product,
+        'related_products': related_products,
+        'error': None  # Para el manejo de errores en la plantilla
     }
-    return render(request, 'storefront/product_detail.html', context)
+    return render(request, 'storefront/shop/product_detail.html', context)
 
 
 # --- Vistas restantes que necesitan conexión al Microservicio de Ventas para Carrito/Checkout/Perfil ---
@@ -183,8 +293,39 @@ def category(request, slug):
 def search(request):
     """Vista de resultados de búsqueda. Obtiene data de Inventario."""
     # Redirigimos a la lista de productos con el parámetro de búsqueda.
-    query = request.GET.get('q')
-    return redirect(f"{redirect('storefront:products')}?search={query}")
+    query = request.GET.get('search')
+    return redirect('storefront:products') + f'?search={query}'
+
+def search_suggestions(request):
+    """API para obtener sugerencias de búsqueda."""
+    query = request.GET.get('q', '').strip()
+    if not query or len(query) < 2:
+        return JsonResponse({'suggestions': []})
+        
+    # Buscar productos que coincidan con el query
+    params = {
+        'busqueda': query,
+        'limit': 5
+    }
+    products_data = _call_inventario_service('productos/', params=params)
+    
+    suggestions = []
+    if 'error' not in products_data:
+        if isinstance(products_data, dict):
+            products = products_data.get('results', [])
+        else:
+            products = products_data[:5]
+            
+        for product in products:
+            suggestions.append({
+                'id': product['id'],
+                'nombre': product['nombre'],
+                'imagen': product.get('imagen', ''),
+                'precio': product['precio'],
+                'url': reverse('storefront:product', args=[product['slug']])
+            })
+            
+    return JsonResponse({'suggestions': suggestions})
 
 def ofertas(request):
     """Vista de ofertas (productos con cupones activos). Obtiene data de Inventario."""
@@ -370,16 +511,31 @@ def checkout(request):
         messages.warning(request, "Tu carrito está vacío.")
         return redirect('storefront:products')
         
-    form = CheckoutForm() # Se asume un formulario de dirección/contacto.
-    
-    # Se necesita llamar a la API de Ventas para obtener info del carrito/productos para el resumen.
-    # Por ahora se usa la sesión (requiere la misma lógica de cart view para obtener detalles de Inventario).
+    # Si el usuario está autenticado, prellenar el formulario
+    if request.user.is_authenticated:
+        try:
+            profile = request.user.profile
+            initial_data = {
+                'nombre': profile.user.first_name,
+                'apellidos': profile.user.last_name,
+                'email': profile.user.email,
+                'telefono': profile.phone,
+                'direccion': profile.address,
+                'ciudad': profile.city,
+                'estado': profile.state,
+                'cp': profile.zip_code,
+            }
+            form = CheckoutForm(initial=initial_data)
+        except Profile.DoesNotExist:
+            form = CheckoutForm()
+    else:
+        form = CheckoutForm()
     
     cart_data = request.session.get('cart', {})
     cart_items = []
-    total = Decimal('0.00')
+    subtotal = Decimal('0.00')
     
-    # Lógica duplicada de la vista cart para obtener el resumen del pedido
+    # Obtener los detalles de los productos y calcular totales
     for product_id, item_data in cart_data.items():
         product_detail_data = _call_inventario_service(f'productos/id/{product_id}/')
         if 'error' not in product_detail_data:
@@ -387,20 +543,50 @@ def checkout(request):
             price = Decimal(str(item_data['price']))
             quantity = item_data['quantity']
             item_total = price * quantity
-            total += item_total
+            subtotal += item_total
             cart_items.append({
                 'product': product,
                 'quantity': quantity,
                 'price': price,
-                'total_price': item_total
+                'subtotal': item_total
             })
+
+    # Calcular IVA (16%)
+    tax = (subtotal * Decimal('0.16')).quantize(Decimal('0.01'))
+    
+    # Calcular costos de envío
+    shipping_cost = Decimal('0.00')
+    if subtotal < Decimal('999.00'):  # Envío gratis en compras mayores a $999
+        shipping_cost = Decimal('99.00')  # Costo base de envío
+
+    # Verificar cupón si existe
+    discount_amount = Decimal('0.00')
+    coupon_code = request.session.get('coupon_code')
+    if coupon_code:
+        coupon_data = _call_inventario_service(f'cupones/{coupon_code}/')
+        if 'error' not in coupon_data and coupon_data.get('activo'):
+            discount_percentage = Decimal(str(coupon_data.get('descuento', '0')))
+            discount_amount = (subtotal * discount_percentage / Decimal('100')).quantize(Decimal('0.01'))
+
+    # Calcular total final incluyendo IVA
+    total_with_tax = subtotal + tax + shipping_cost - discount_amount
+    
+    # Obtener lista de estados
+    estados_data = _call_inventario_service('estados/')
+    estados = estados_data if 'error' not in estados_data else []
             
     context = {
         'form': form,
         'cart_items': cart_items,
-        'cart_total': total
+        'cart_total': subtotal,
+        'tax': tax,
+        'shipping_cost': shipping_cost,
+        'discount_amount': discount_amount,
+        'total_with_tax': total_with_tax,
+        'estados': estados,
+        'free_shipping_threshold': Decimal('999.00')
     }
-    return render(request, 'storefront/checkout.html', context)
+    return render(request, 'storefront/shop/checkout.html', context)
 
 @require_POST
 def checkout_confirm(request):
@@ -709,3 +895,48 @@ def api_get_cart_total(request):
         total += Decimal(item['price']) * item['quantity']
         
     return JsonResponse({'total': str(total)}) # Se usa str() para que sea serializable a JSON
+
+@require_POST
+def validate_coupon(request):
+    """API para validar cupones de descuento."""
+    try:
+        data = json.loads(request.body)
+        coupon_code = data.get('codigo')
+        
+        if not coupon_code:
+            return JsonResponse({
+                'valid': False,
+                'message': 'Código de cupón no proporcionado'
+            })
+            
+        # Validar cupón con el servicio de inventario
+        coupon_data = _call_inventario_service(f'cupones/{coupon_code}/')
+        
+        if 'error' in coupon_data:
+            return JsonResponse({
+                'valid': False,
+                'message': 'Cupón no encontrado'
+            })
+            
+        if not coupon_data.get('activo'):
+            return JsonResponse({
+                'valid': False,
+                'message': 'Este cupón ya no está activo'
+            })
+            
+        # Si el cupón es válido, guardarlo en la sesión
+        request.session['coupon_code'] = coupon_code
+        request.session.modified = True
+        
+        return JsonResponse({
+            'valid': True,
+            'message': f'Cupón aplicado: {coupon_data.get("descuento")}% de descuento',
+            'discount_percent': coupon_data.get('descuento')
+        })
+        
+    except Exception as e:
+        logger.error(f"Error al validar cupón: {e}")
+        return JsonResponse({
+            'valid': False,
+            'message': 'Error al validar el cupón'
+        }, status=500)
