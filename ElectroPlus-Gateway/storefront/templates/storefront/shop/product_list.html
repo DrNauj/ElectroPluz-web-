@@ -1,0 +1,141 @@
+{% extends "storefront/base/base.html" %}
+{% load static %}
+
+{% block title %}
+    {% if categoria %}{{ categoria.nombre }}
+    {% elif search_query %}Búsqueda: {{ search_query }}
+    {% elif is_ofertas %}Ofertas
+    {% else %}Productos{% endif %} - ElectroPlus
+{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'storefront:home' %}">Inicio</a></li>
+            {% if categoria %}
+            <li class="breadcrumb-item active">{{ categoria.nombre }}</li>
+            {% elif search_query %}
+            <li class="breadcrumb-item active">Búsqueda: {{ search_query }}</li>
+            {% elif is_ofertas %}
+            <li class="breadcrumb-item active">Ofertas</li>
+            {% else %}
+            <li class="breadcrumb-item active">Productos</li>
+            {% endif %}
+        </ol>
+    </nav>
+
+    <!-- Filtros y Ordenamiento -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Filtros</h5>
+                    <form method="get">
+                        <!-- Categorías -->
+                        {% if not categoria %}
+                        <div class="mb-3">
+                            <label class="form-label">Categorías</label>
+                            {% for cat in categories %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="category" 
+                                    value="{{ cat.id }}" id="cat_{{ cat.id }}"
+                                    {% if selected_category == cat.id %}checked{% endif %}>
+                                <label class="form-check-label" for="cat_{{ cat.id }}">
+                                    {{ cat.nombre }}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Rango de Precios -->
+                        <div class="mb-3">
+                            <label class="form-label">Precio</label>
+                            <div class="input-group mb-2">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" name="min_price" 
+                                    placeholder="Min" value="{{ request.GET.min_price }}">
+                            </div>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" name="max_price" 
+                                    placeholder="Max" value="{{ request.GET.max_price }}">
+                            </div>
+                        </div>
+
+                        <!-- Ordenamiento -->
+                        <div class="mb-3">
+                            <label class="form-label">Ordenar por</label>
+                            <select class="form-select" name="ordering">
+                                <option value="-fecha_creacion" {% if ordering == '-fecha_creacion' %}selected{% endif %}>Más recientes</option>
+                                <option value="precio" {% if ordering == 'precio' %}selected{% endif %}>Menor precio</option>
+                                <option value="-precio" {% if ordering == '-precio' %}selected{% endif %}>Mayor precio</option>
+                                {% if is_ofertas %}
+                                <option value="-descuento" {% if ordering == '-descuento' %}selected{% endif %}>Mayor descuento</option>
+                                {% endif %}
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">Aplicar Filtros</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Productos -->
+        <div class="col-md-9">
+            {% if products %}
+            <div class="row row-cols-1 row-cols-md-3 g-4">
+                {% for product in products %}
+                <div class="col">
+                    {% include "storefront/includes/product-card.html" with product=product %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Paginación -->
+            {% if page_obj.has_other_pages %}
+            <nav class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            Anterior
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            {{ num }}
+                        </a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">
+                            Siguiente
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <div class="alert alert-info">
+                No se encontraron productos que coincidan con los criterios de búsqueda.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

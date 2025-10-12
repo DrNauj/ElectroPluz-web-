@@ -24,8 +24,8 @@
                     <ul class="dropdown-menu">
                         {% for category in categories %}
                         <li>
-                            <a class="dropdown-item" href="{% url 'storefront:category' category.slug %}">
-                                {{ category.name }}
+                            <a class="dropdown-item" href="{% url 'storefront:products' %}?category={{ category.id }}">
+                                {{ category.nombre }}
                             </a>
                         </li>
                         {% empty %}

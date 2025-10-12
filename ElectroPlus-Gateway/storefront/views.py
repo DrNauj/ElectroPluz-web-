@@ -24,8 +24,8 @@ def _call_inventario_service(endpoint, params=None):
     """
     base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL'].rstrip('/')
     api_key = settings.MICROSERVICES['INVENTARIO']['API_KEY']
-    # Usar el endpoint directamente sin prefijo 'catalogo/'
-    url = f"{base_url}/{endpoint}"
+    # Usar el endpoint con prefijo 'api/'
+    url = f"{base_url}/api/{endpoint}"
     
     headers = {
         'X-API-Key': api_key,
@@ -55,21 +55,24 @@ def home(request):
     # 1. Obtener categorías
     categories = []
     category_data = _call_inventario_service('categorias/')
-    if isinstance(category_data, list):
-        categories = category_data
+    if 'error' not in category_data:
+        categories = category_data.get('results', []) if isinstance(category_data, dict) else category_data
     
     # 2. Obtener productos destacados
     featured_products = []
-    # Solicitamos productos marcados como destacados o los 8 más vendidos
-    featured_products_data = _call_inventario_service('productos/', params={'featured': 'true', 'limit': 8})
-    if isinstance(featured_products_data, list):
-        featured_products = featured_products_data
-    elif isinstance(featured_products_data, dict) and 'results' in featured_products_data:
-        featured_products = featured_products_data['results']
+    # Solicitamos los productos más recientes por ahora
+    featured_params = {
+        'limit': 8,
+        'ordering': '-id'  # Ordenar por más recientes
+    }
+    featured_products_data = _call_inventario_service('productos/', params=featured_params)
+    if 'error' not in featured_products_data:
+        featured_products = featured_products_data.get('results', [])
     
     context = {
         'categories': categories,
         'featured_products': featured_products,
+        'active_coupons': []  # Por ahora no tenemos cupones
     }
     return render(request, 'storefront/home.html', context)
 
@@ -79,14 +82,20 @@ def product_list(request):
     # Parámetros para la API de Inventario
     params = {
         'page': request.GET.get('page', 1),
-        'category_slug': request.GET.get('category'), # Usamos slug para el filtro
+        'categoria': request.GET.get('category'),  # ID de la categoría
         'min_price': request.GET.get('min_price'),
         'max_price': request.GET.get('max_price'),
-        'search': request.GET.get('search'), # Soporte para búsqueda
-        'order_by': request.GET.get('sort_by'),
-        'on_sale': request.GET.get('on_sale'),  # Filtro de ofertas
-        'ordenar': request.GET.get('ordenar'),  # Campo de ordenamiento personalizado
+        'search': request.GET.get('search'),  # Soporte para búsqueda
+        'ordering': request.GET.get('ordering', '-fecha_creacion'),  # Ordenamiento
+        'active_coupon': request.GET.get('active_coupon'),  # Filtrar por cupones activos
     }
+
+    # Obtener la categoría seleccionada si existe
+    selected_category = None
+    if params['categoria']:
+        categoria_data = _call_inventario_service(f'categorias/{params["categoria"]}/')
+        if 'error' not in categoria_data:
+            selected_category = categoria_data
     
     # Limpiar parámetros vacíos
     params = {k: v for k, v in params.items() if v}
@@ -111,9 +120,13 @@ def product_list(request):
         'page_obj': page_obj,
         'products': page_obj.object_list,
         'categories': categories if isinstance(categories, list) else [],
-        'current_category': request.GET.get('category'),
+        'categoria': selected_category,
+        'search_query': request.GET.get('search'),
+        'is_ofertas': request.GET.get('active_coupon') == 'true',
+        'ordering': request.GET.get('ordering', '-fecha_creacion'),
+        'selected_category': params['categoria']
     }
-    return render(request, 'storefront/product_list.html', context)
+    return render(request, 'storefront/shop/product_list.html', context)
 
 def product_detail(request, slug):
     """Detalle de un producto. Obtiene datos de Inventario por slug."""
@@ -157,11 +170,11 @@ def search(request):
     return redirect(f"{redirect('storefront:products')}?search={query}")
 
 def ofertas(request):
-    """Vista de ofertas (productos con descuento). Obtiene data de Inventario."""
+    """Vista de ofertas (productos con cupones activos). Obtiene data de Inventario."""
     # Añadimos los parámetros de ofertas al request
     request.GET = request.GET.copy()
-    request.GET['on_sale'] = 'true'
-    request.GET['ordenar'] = 'descuento' # Ordenar por mayor descuento primero
+    request.GET['active_coupon'] = 'true'  # Filtrar productos con cupones activos
+    request.GET['ordering'] = '-descuento'  # Ordenar por mayor descuento primero
     return product_list(request)
 
 # --- Vistas de Carrito (Usan sesiones locales, no tocan API aún) ---
@@ -272,17 +285,70 @@ def cart_add(request):
 
 @require_POST
 def cart_update(request):
-    # Lógica de actualización de carrito, similar a cart_add pero con override_quantity
-    # ... (Se mantiene la lógica original por ser extensa) ...
-    messages.error(request, "La función de actualización de carrito no está completamente implementada para API.")
-    return redirect('storefront:cart')
+    try:
+        product_id = request.POST.get('product_id')
+        quantity = int(request.POST.get('quantity', 0))
+        
+        # Validación con inventario
+        product_data = _call_inventario_service(f'productos/id/{product_id}/')
+        
+        if 'error' in product_data:
+            messages.error(request, product_data['error'])
+            return redirect('storefront:cart')
+            
+        product = product_data
+        
+        # Validar stock
+        if quantity > product.get('stock', 0):
+            messages.warning(request, f"Solo hay {product.get('stock', 0)} unidades disponibles.")
+            quantity = product.get('stock', 0)
+            
+        if quantity <= 0:
+            # Si la cantidad es 0 o negativa, eliminar del carrito
+            return cart_remove(request)
+        
+        cart = request.session.get('cart', {})
+        product_id_str = str(product_id)
+        
+        if product_id_str in cart:
+            cart[product_id_str]['quantity'] = quantity
+            request.session['cart'] = cart
+            request.session.modified = True
+            messages.success(request, f"Cantidad actualizada para {product['nombre']}")
+        else:
+            messages.error(request, "Producto no encontrado en el carrito")
+            
+        return redirect('storefront:cart')
+    except Exception as e:
+        logger.error(f"Error en cart_update: {e}")
+        messages.error(request, "Error al actualizar el carrito")
+        return redirect('storefront:cart')
 
 
+@require_POST
 def cart_remove(request):
-    # Lógica de eliminación de carrito
-    # ... (Se mantiene la lógica original por ser extensa) ...
-    messages.error(request, "La función de eliminación de carrito no está completamente implementada para API.")
-    return redirect('storefront:cart')
+    try:
+        product_id = request.POST.get('product_id')
+        cart = request.session.get('cart', {})
+        product_id_str = str(product_id)
+        
+        if product_id_str in cart:
+            # Obtener info del producto para el mensaje
+            product_data = _call_inventario_service(f'productos/id/{product_id}/')
+            product_name = product_data.get('nombre', 'Producto') if 'error' not in product_data else 'Producto'
+            
+            del cart[product_id_str]
+            request.session['cart'] = cart
+            request.session.modified = True
+            messages.success(request, f"{product_name} eliminado del carrito")
+        else:
+            messages.error(request, "Producto no encontrado en el carrito")
+            
+        return redirect('storefront:cart')
+    except Exception as e:
+        logger.error(f"Error en cart_remove: {e}")
+        messages.error(request, "Error al eliminar del carrito")
+        return redirect('storefront:cart')
 
 
 def checkout(request):
@@ -378,6 +444,26 @@ def checkout_confirm(request):
                 timeout=10
             )
             response.raise_for_status()
+            
+            # Actualizar stock en inventario
+            for item in order_details:
+                # Llamar a la API de inventario para actualizar stock
+                stock_update = {
+                    'cantidad': item['quantity'],
+                    'tipo_movimiento': 'Salida por Venta',
+                    'request_id': new_order.get('order_id', '')
+                }
+                try:
+                    stock_response = requests.post(
+                        f"{settings.INVENTORY_API_URL}/productos/{item['product_id']}/actualizar_stock/",
+                        json=stock_update,
+                        headers={'X-API-Key': settings.INVENTORY_API_KEY},
+                        timeout=5
+                    )
+                    stock_response.raise_for_status()
+                except Exception as e:
+                    logger.error(f"Error actualizando stock para producto {item['product_id']}: {e}")
+                    # No revertimos la orden pero registramos el error
             
             # Si es exitoso, vaciar carrito de la sesión
             del request.session['cart']

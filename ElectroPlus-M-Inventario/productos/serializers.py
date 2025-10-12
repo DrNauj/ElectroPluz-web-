@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Categoria, Proveedor, Producto, HistorialInventario
+from .serializers_cupones import CuponSerializer, UsoCuponSerializer
 
 
 class CategoriaSerializer(serializers.ModelSerializer):

@@ -1,4 +1,5 @@
 from django.db import models
+from .models_cupones import Cupon, UsoCupon
 
 class Categoria(models.Model):
     id = models.AutoField(primary_key=True)
