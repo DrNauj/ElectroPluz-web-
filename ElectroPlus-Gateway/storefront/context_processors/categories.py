@@ -10,34 +10,40 @@ logger = logging.getLogger(__name__)
 
 def categories(request):
     """
-    Agrega las categorías al contexto global.
+    Agrega las categorías al contexto global usando caché de manera eficiente.
     """
+    # No procesar para archivos estáticos o admin
+    if request.path.startswith(('/static/', '/admin/', '/media/')):
+        return {'categories': []}
+        
+    from django.core.cache import cache
+    from storefront.views import _call_inventario_service
+    
+    CACHE_KEY = 'global_categories'
+    CACHE_TIMEOUT = 3600  # 1 hora
+    
     try:
-        # Configuración del servicio de inventario
-        base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL'].rstrip('/')
-        api_key = settings.MICROSERVICES['INVENTARIO']['API_KEY']
+        # Intentar obtener del caché
+        categories_data = cache.get(CACHE_KEY)
         
-        # URL para obtener categorías
-        url = f"{base_url}/api/categorias/"
+        if categories_data is None:
+            # No está en caché, obtener usando el helper optimizado
+            categories_data = _call_inventario_service(
+                'categorias/',
+                cache_timeout=CACHE_TIMEOUT
+            )
+            
+            # Procesar respuesta
+            if isinstance(categories_data, list):
+                categories_data = categories_data
+            elif isinstance(categories_data, dict) and 'results' in categories_data:
+                categories_data = categories_data['results']
+            elif isinstance(categories_data, dict) and 'error' in categories_data:
+                categories_data = []
+            else:
+                categories_data = []
         
-        # Headers necesarios
-        headers = {
-            'X-API-Key': api_key,
-            'Accept': 'application/json'
-        }
-        
-        # Realizar la petición
-        response = requests.get(url, headers=headers, timeout=5)
-        response.raise_for_status()
-        
-        # Procesar la respuesta
-        categories_data = response.json()
-        if isinstance(categories_data, list):
-            return {'categories': categories_data}
-        elif isinstance(categories_data, dict) and 'results' in categories_data:
-            return {'categories': categories_data['results']}
-        else:
-            return {'categories': []}
+        return {'categories': categories_data}
             
     except Exception as e:
         logger.error(f"Error al obtener categorías: {str(e)}")

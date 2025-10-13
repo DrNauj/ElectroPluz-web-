@@ -47,11 +47,20 @@ MICROSERVICES = {
 # Configuración de Caché
 CACHES = {
     'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-gateway',
+        'TIMEOUT': 300,  # 5 minutos por defecto
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000,  # Máximo número de entradas en caché
+            'CULL_FREQUENCY': 3,  # Fracción de entradas a eliminar cuando se llena
+        }
+    },
+    'file_based': {
         'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
         'LOCATION': BASE_DIR / 'django_cache',
-        'TIMEOUT': 300,  # 5 minutos
+        'TIMEOUT': 60 * 60 * 24,  # 24 horas
         'OPTIONS': {
-            'MAX_ENTRIES': 1000
+            'MAX_ENTRIES': 5000
         }
     }
 }
@@ -160,18 +169,19 @@ USE_TZ = True
 
 
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
-    # BASE_DIR / 'sales' / 'static',
-    # BASE_DIR / 'inventory' / 'static',
 ]
 
-# Configuración de archivos estáticos para producción
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
+# Configuración de archivos estáticos optimizada
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Configuración de WhiteNoise
+MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+WHITENOISE_MAX_AGE = 31536000  # 1 año en segundos
+WHITENOISE_SKIP_COMPRESS_EXTENSIONS = []  # Comprimir todos los tipos de archivos
 
 # Configuración de caché
 CACHES = {

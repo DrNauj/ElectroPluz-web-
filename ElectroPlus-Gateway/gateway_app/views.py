@@ -287,7 +287,7 @@ def login_view(request):
     else:
         form = CustomLoginForm()
 
-    return render(request, 'auth/login.html', {'form': form})
+    return render(request, 'storefront/auth/login.html', {'form': form})
 
 def register_view(request):
     """Vista web para el formulario de registro."""

@@ -1,0 +1,43 @@
+/* Estilos para el modal de login */
+.modal-content {
+    border-radius: 1rem;
+}
+
+.modal-header, .modal-footer {
+    padding: 1.5rem;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+/* Estilos para las notificaciones toast */
+.toast {
+    min-width: 250px;
+}
+
+.toast.bg-success {
+    border-left: 4px solid #198754;
+}
+
+.toast.bg-danger {
+    border-left: 4px solid #dc3545;
+}
+
+/* Animaciones */
+.modal.fade .modal-dialog {
+    transition: transform 0.3s ease-out;
+}
+
+.toast.show {
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}

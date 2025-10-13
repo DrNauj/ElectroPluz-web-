@@ -19,16 +19,45 @@ from .cart import Cart
 
 logger = logging.getLogger(__name__)
 
+# Session global para reutilizar conexiones
+_session = None
+
+def get_session():
+    """Obtiene una sesión HTTP reutilizable con configuración optimizada."""
+    global _session
+    if _session is None:
+        _session = requests.Session()
+        retry_strategy = requests.packages.urllib3.util.retry.Retry(
+            total=2,  # Reducido a 2 intentos
+            backoff_factor=0.1,
+            status_forcelist=[500, 502, 503, 504]
+        )
+        adapter = requests.adapters.HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=25,  # Pool de conexiones
+            pool_maxsize=25
+        )
+        _session.mount("http://", adapter)
+    return _session
+
 # --- Helper para llamadas a Inventario ---
-def _call_inventario_service(endpoint, params=None, cache_timeout=300):
+def _call_inventario_service(endpoint, params=None, cache_timeout=300, force_refresh=False):
     """
     Llama al microservicio de Inventario y devuelve los datos JSON.
     Implementa caché y manejo optimizado de errores.
     """
     from django.core.cache import cache
+    import hashlib
     
     base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL'].rstrip('/')
     api_key = settings.MICROSERVICES['INVENTARIO']['API_KEY']
+    
+    # Crear una clave de caché más eficiente
+    cache_parts = [endpoint.strip('/')]
+    if params:
+        param_str = '&'.join(f"{k}={v}" for k, v in sorted(params.items()))
+        cache_parts.append(param_str)
+    cache_key = hashlib.md5('_'.join(cache_parts).encode()).hexdigest()
     
     # Normalizar el endpoint y crear cache_key
     endpoint = endpoint.strip('/')
@@ -48,25 +77,50 @@ def _call_inventario_service(endpoint, params=None, cache_timeout=300):
         'Accept': 'application/json'
     }
     
+    # Si no es force_refresh, intentar obtener del caché
+    if not force_refresh:
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            return cached_data
+    
+    url = f"{base_url}/api/{endpoint}/"
+    headers = {
+        'X-API-Key': api_key,
+        'Accept': 'application/json',
+        'Connection': 'keep-alive'
+    }
+    
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=2)
+        response = get_session().get(
+            url, 
+            headers=headers, 
+            params=params, 
+            timeout=3  # Reducido a 3 segundos
+        )
         response.raise_for_status()
         data = response.json()
         
-        # Guardar en caché
-        cache.set(cache_key, data, cache_timeout)
+        # Guardar en caché solo si no hay error
+        if isinstance(data, (dict, list)) and 'error' not in data:
+            cache.set(cache_key, data, cache_timeout)
         return data
+        
     except requests.exceptions.HTTPError as e:
-        # Error HTTP (400, 404, 500, etc.)
         status_code = e.response.status_code
-        logger.error(f"HTTP Error al consultar Inventario ({url}): {status_code} - {e.response.text}")
-        if status_code == 404:
-            return {'error': "Producto o recurso no encontrado."}
-        return {'error': f"Error en el servicio de inventario: Código {status_code}"}
+        logger.error(f"HTTP Error ({url}): {status_code}")
+        # Intentar usar caché expirado en caso de error
+        stale_data = cache.get(cache_key)
+        if stale_data is not None:
+            return stale_data
+        return {'error': "Servicio temporalmente no disponible"}
+        
     except requests.exceptions.RequestException as e:
-        # Error de conexión (DNS, Timeout, etc.)
-        logger.error(f"Error de conexión al consultar Inventario ({url}): {e}")
-        return {'error': "Error de conexión con el servicio de inventario. Intente más tarde."}
+        logger.error(f"Error de conexión ({url}): {str(e)}")
+        # Intentar usar caché expirado en caso de error
+        stale_data = cache.get(cache_key)
+        if stale_data is not None:
+            return stale_data
+        return {'error': "Error de conexión"}
 
 
 def home(request):
@@ -78,22 +132,13 @@ def home(request):
     # Obtener el parámetro de ordenamiento
     sort = request.GET.get('sort', 'default')
     
-    # 1. Obtener categorías desde caché o servicio
-    from django.core.cache import cache
-    cache_key = 'storefront_categories'
-    categories = cache.get(cache_key)
+    # Usar las categorías del context processor
+    # No necesitamos obtenerlas aquí porque ya están en el contexto
     
-    if categories is None:
-        category_data = _call_inventario_service('categorias/')
-        categories = []
-        if 'error' not in category_data:
-            categories = category_data if isinstance(category_data, list) else []
-            # Guardar en caché por 1 hora
-            cache.set(cache_key, categories, 3600)
-    
-    # 2. Obtener productos
+    # Obtener productos con parámetros optimizados
     params = {
-        'limit': 12,  # Mostrar más productos en la página principal
+        'limit': 12,
+        'fields': 'id,nombre,precio,imagen,slug'  # Solicitar solo los campos necesarios
     }
     
     # Aplicar ordenamiento
@@ -129,46 +174,42 @@ def home(request):
         else:
             product['precio_original'] = product.get('precio')
             
+    # Obtener cupones activos y nuevos productos en paralelo
+    try:
+        # Obtener cupones activos
+        coupons_data = _call_inventario_service('cupones/', params={'activo': 'true', 'limit': 3})
+        active_coupons = []
+        if 'error' not in coupons_data:
+            active_coupons = coupons_data if isinstance(coupons_data, list) else []
+
+        # Obtener productos recién llegados
+        new_params = {
+            'limit': 5,
+            'ordering': '-id'
+        }
+        new_products = _call_inventario_service('productos/', params=new_params)
+        new_arrivals = []
+        if 'error' not in new_products:
+            if isinstance(new_products, dict):
+                new_arrivals = new_products.get('results', [])
+            else:
+                new_arrivals = new_products[:5]
+    except Exception as e:
+        logger.error(f"Error al obtener datos adicionales: {e}")
+        active_coupons = []
+        new_arrivals = []
+
     context = {
-        'categories': categories,
         'products': products,
         'error': error,
-        'active_sort': sort
+        'active_sort': sort,
+        'active_coupons': active_coupons,
+        'new_arrivals': new_arrivals,
+        'current_section': 'home'
     }
     
     end_time = time.time()
     logger.info(f"Tiempo total de carga home: {end_time - start_time:.2f} segundos")
-    return render(request, 'storefront/shop/home.html', context)
-    
-    # 3. Obtener cupones activos
-    active_coupons = []
-    try:
-        coupons_data = _call_inventario_service('cupones/', params={'activo': 'true', 'limit': 3})
-        if 'error' not in coupons_data:
-            active_coupons = coupons_data if isinstance(coupons_data, list) else []
-    except Exception as e:
-        logger.error(f"Error al obtener cupones: {e}")
-
-    # 4. Obtener productos recién llegados para el carrusel
-    new_arrivals = []
-    new_params = {
-        'limit': 5,
-        'ordering': '-id'
-    }
-    new_products = _call_inventario_service('productos/', params=new_params)
-    if 'error' not in new_products:
-        if isinstance(new_products, dict):
-            new_arrivals = new_products.get('results', [])
-        else:
-            new_arrivals = new_products[:5]
-
-    context = {
-        'categories': categories,
-        'featured_products': featured_products,
-        'active_coupons': active_coupons,
-        'new_arrivals': new_arrivals,
-        'current_section': 'home'  # Para marcar el enlace activo en el navbar
-    }
     return render(request, 'storefront/shop/home.html', context)
 
 def category(request, slug):
@@ -331,7 +372,10 @@ def product_detail(request, slug):
         
     product = product_data
     
-    # Asegurar tipos de datos correctos
+    # Asegurar tipos de datos correctos y obtener productos relacionados en paralelo
+    related_products = []
+    
+    # 1. Procesar precios
     if 'precio' in product and product['precio'] is not None:
         product['precio'] = Decimal(str(product['precio']))
     if 'precio_original' in product and product['precio_original'] is not None:
@@ -339,18 +383,23 @@ def product_detail(request, slug):
     else:
         product['precio_original'] = product.get('precio')
     
-    # 2. Obtener productos relacionados (de la misma categoría)
-    related_products = []
-    if product.get('categoria', {}).get('id'):
+    # 2. Obtener productos relacionados desde caché o servicio
+    cache_key = f'related_products_{product.get("id")}'
+    related_products = cache.get(cache_key)
+    
+    if related_products is None and product.get('categoria', {}).get('id'):
         try:
             params = {
                 'categoria': product['categoria']['id'],
-                'exclude': product['id'],  # No incluir el producto actual
-                'limit': 4  # Limitar a 4 productos relacionados
+                'exclude': product['id'],
+                'limit': 4,
+                'ordering': '?'  # Orden aleatorio
             }
             related_data = _call_inventario_service('productos', params=params)
             if isinstance(related_data, dict) and 'results' in related_data:
                 related_products = related_data['results'][:4]
+                # Guardar en caché por 15 minutos
+                cache.set(cache_key, related_products, 900)
                 
                 # Asegurar que los productos relacionados tengan todos los campos necesarios
                 related_products = [
@@ -377,22 +426,6 @@ def product_detail(request, slug):
 # Nota: Las vistas de Carrito y Perfil a continuación todavía utilizan la lógica de sesión 
 # local para el carrito y necesitan ser adaptadas para interactuar completamente con la API de Ventas 
 # para crear pedidos (Checkout) y consultar pedidos existentes (Profile/Orders).
-
-def category(request, slug):
-    """Vista de productos filtrados por categoría usando slug."""
-    # Obtener la categoría por slug
-    category_data = _call_inventario_service('categorias/')
-    if 'error' not in category_data:
-        categories = category_data if isinstance(category_data, list) else []
-        category = next((cat for cat in categories if cat['slug'] == slug), None)
-        if category:
-            # En lugar de redirigir, renderizamos directamente la lista con el filtro
-            request.GET = request.GET.copy()
-            request.GET['category_slug'] = slug
-            return product_list(request)
-    
-    messages.error(request, "Categoría no encontrada")
-    return redirect('storefront:products')
 
 def search(request):
     """Vista de resultados de búsqueda. Obtiene data de Inventario."""

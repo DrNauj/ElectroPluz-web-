@@ -1,0 +1,64 @@
+/* auth-modal.css */
+.modal-auth .modal-content {
+    border-radius: 1rem;
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.modal-auth .modal-header {
+    border: none;
+    padding: 2rem 2rem 1rem;
+}
+
+.modal-auth .modal-body {
+    padding: 1rem 2rem;
+}
+
+.modal-auth .modal-footer {
+    border: none;
+    padding: 1rem 2rem 2rem;
+}
+
+.modal-auth .btn-close {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+}
+
+.modal-auth .form-control {
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+}
+
+.modal-auth .btn-primary {
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+}
+
+.modal-auth .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.auth-alert {
+    border-radius: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+/* Estilos para elementos que requieren autenticación */
+[data-auth-required],
+[data-role-required] {
+    display: none;
+}
+
+/* Animaciones */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-auth .alert {
+    animation: fadeIn 0.3s ease-out;
+}

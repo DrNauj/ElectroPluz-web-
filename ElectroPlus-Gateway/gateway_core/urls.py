@@ -17,7 +17,7 @@ urlpatterns = [
     path('dashboard/', include('inventory.urls', namespace='dashboard')),
     
     # Rutas de autenticación
-    path('auth/', include('gateway_app.urls')),
+    path('auth/', include('gateway_app.urls', namespace='auth')),
     path('api/auth/', include('gateway_app.urls_auth')),
     
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
