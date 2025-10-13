@@ -20,32 +20,42 @@ from .cart import Cart
 logger = logging.getLogger(__name__)
 
 # --- Helper para llamadas a Inventario ---
-def _call_inventario_service(endpoint, params=None):
+def _call_inventario_service(endpoint, params=None, cache_timeout=300):
     """
     Llama al microservicio de Inventario y devuelve los datos JSON.
-    Centraliza el manejo de errores HTTP y de conexión.
+    Implementa caché y manejo optimizado de errores.
     """
+    from django.core.cache import cache
+    
     base_url = settings.MICROSERVICES['INVENTARIO']['BASE_URL'].rstrip('/')
     api_key = settings.MICROSERVICES['INVENTARIO']['API_KEY']
     
-    # Normalizar el endpoint
+    # Normalizar el endpoint y crear cache_key
     endpoint = endpoint.strip('/')
-    url = f"{base_url}/api/{endpoint}/"
-    
-    # Debug logging
-    logger.debug(f"Calling inventario service: {url}")
+    cache_key = f"inv_{endpoint}"
     if params:
-        logger.debug(f"With params: {params}")
+        param_str = '_'.join(f"{k}:{v}" for k, v in sorted(params.items()))
+        cache_key += f"_{param_str}"
     
+    # Intentar obtener del caché
+    cached_data = cache.get(cache_key)
+    if cached_data is not None:
+        return cached_data
+    
+    url = f"{base_url}/api/{endpoint}/"
     headers = {
         'X-API-Key': api_key,
         'Accept': 'application/json'
     }
     
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=5)
-        response.raise_for_status() # Lanza error si el status no es 2xx
-        return response.json()
+        response = requests.get(url, headers=headers, params=params, timeout=2)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Guardar en caché
+        cache.set(cache_key, data, cache_timeout)
+        return data
     except requests.exceptions.HTTPError as e:
         # Error HTTP (400, 404, 500, etc.)
         status_code = e.response.status_code
@@ -60,41 +70,75 @@ def _call_inventario_service(endpoint, params=None):
 
 
 def home(request):
-    """Vista de la página principal. Obtiene categorías y productos destacados de Inventario."""
+    """Vista de la página principal optimizada."""
+    import time
+    start_time = time.time()
+    logger.debug("Iniciando vista home")
     
-    # 1. Obtener categorías
-    categories = []
-    category_data = _call_inventario_service('categorias/')
-    if 'error' not in category_data:
-        categories = category_data if isinstance(category_data, list) else []
+    # Obtener el parámetro de ordenamiento
+    sort = request.GET.get('sort', 'default')
     
-    # 2. Obtener productos destacados
-    featured_products = []
-    # Obtener productos con descuento primero
-    featured_params = {
-        'con_descuento': 'true',
-        'limit': 4,
-        'ordering': '-descuento'
+    # 1. Obtener categorías desde caché o servicio
+    from django.core.cache import cache
+    cache_key = 'storefront_categories'
+    categories = cache.get(cache_key)
+    
+    if categories is None:
+        category_data = _call_inventario_service('categorias/')
+        categories = []
+        if 'error' not in category_data:
+            categories = category_data if isinstance(category_data, list) else []
+            # Guardar en caché por 1 hora
+            cache.set(cache_key, categories, 3600)
+    
+    # 2. Obtener productos
+    params = {
+        'limit': 12,  # Mostrar más productos en la página principal
     }
-    featured_discounted = _call_inventario_service('productos/', params=featured_params)
-    if 'error' not in featured_discounted:
-        if isinstance(featured_discounted, dict):
-            featured_products.extend(featured_discounted.get('results', []))
-        else:
-            featured_products.extend(featured_discounted[:4])
     
-    # Si no hay suficientes productos con descuento, agregar productos recientes
-    if len(featured_products) < 8:
-        recent_params = {
-            'limit': 8 - len(featured_products),
-            'ordering': '-id'
-        }
-        recent_products = _call_inventario_service('productos/', params=recent_params)
-        if 'error' not in recent_products:
-            if isinstance(recent_products, dict):
-                featured_products.extend(recent_products.get('results', []))
-            else:
-                featured_products.extend(recent_products)
+    # Aplicar ordenamiento
+    if sort == 'price_low':
+        params['ordering'] = 'precio'
+    elif sort == 'price_high':
+        params['ordering'] = '-precio'
+    elif sort == 'name':
+        params['ordering'] = 'nombre'
+    else:
+        params['ordering'] = '-id'  # Por defecto, los más recientes primero
+    
+    products_data = _call_inventario_service('productos/', params=params)
+    logger.debug(f"Respuesta de productos: {products_data}")
+    
+    products = []
+    error = None
+    
+    if isinstance(products_data, dict):
+        if 'results' in products_data:
+            products = products_data['results']
+        elif 'error' in products_data:
+            error = products_data['error']
+    elif isinstance(products_data, list):
+        products = products_data
+    
+    # Asegurar que los precios sean Decimal
+    for product in products:
+        if 'precio' in product and product['precio'] is not None:
+            product['precio'] = Decimal(str(product['precio']))
+        if 'precio_original' in product and product['precio_original'] is not None:
+            product['precio_original'] = Decimal(str(product['precio_original']))
+        else:
+            product['precio_original'] = product.get('precio')
+            
+    context = {
+        'categories': categories,
+        'products': products,
+        'error': error,
+        'active_sort': sort
+    }
+    
+    end_time = time.time()
+    logger.info(f"Tiempo total de carga home: {end_time - start_time:.2f} segundos")
+    return render(request, 'storefront/shop/home.html', context)
     
     # 3. Obtener cupones activos
     active_coupons = []
@@ -129,15 +173,32 @@ def home(request):
 
 def category(request, slug):
     """Vista de productos filtrados por categoría usando slug."""
-    # Obtener la categoría por slug
-    category_data = _call_inventario_service('categorias/')
-    if 'error' not in category_data:
-        categories = category_data if isinstance(category_data, list) else []
-        category = next((cat for cat in categories if cat['slug'] == slug), None)
-        if category:
-            request.GET = request.GET.copy()
-            request.GET['category_slug'] = slug
-            return product_list(request)
+    import time
+    start_time = time.time()
+    logger.debug(f"Iniciando vista de categoría: {slug}")
+    
+    # Obtener la categoría desde caché o servicio
+    from django.core.cache import cache
+    cache_key = f'category_{slug}'
+    category = cache.get(cache_key)
+    
+    if category is None:
+        category_data = _call_inventario_service('categorias/')
+        if 'error' not in category_data:
+            categories = category_data if isinstance(category_data, list) else []
+            category = next((cat for cat in categories if cat['slug'] == slug), None)
+            if category:
+                # Guardar en caché por 1 hora
+                cache.set(cache_key, category, 3600)
+    
+    if category:
+        request.GET = request.GET.copy()
+        request.GET['category_slug'] = slug
+        response = product_list(request)
+        
+        end_time = time.time()
+        logger.info(f"Tiempo total de carga categoría {slug}: {end_time - start_time:.2f} segundos")
+        return response
     
     messages.error(request, "Categoría no encontrada")
     return redirect('storefront:products')
@@ -231,11 +292,21 @@ def product_list(request):
 
 def product_detail(request, slug):
     """Detalle de un producto y sus productos relacionados."""
+    import time
+    start_time = time.time()
     
     try:
-        # 1. Obtener detalles del producto
-        logger.debug(f"Buscando producto con slug: {slug}")
-        product_data = _call_inventario_service(f'productos/{slug}')
+        # 1. Obtener detalles del producto desde caché o servicio
+        from django.core.cache import cache
+        cache_key = f'product_detail_{slug}'
+        product_data = cache.get(cache_key)
+        
+        if product_data is None:
+            logger.debug(f"Cache miss para producto {slug}, obteniendo del servicio")
+            product_data = _call_inventario_service(f'productos/{slug}')
+            if isinstance(product_data, dict) and 'error' not in product_data:
+                # Guardar en caché por 15 minutos (más corto que categorías porque los precios pueden cambiar)
+                cache.set(cache_key, product_data, 900)
         
         if isinstance(product_data, dict):
             if 'error' in product_data:
@@ -261,10 +332,12 @@ def product_detail(request, slug):
     product = product_data
     
     # Asegurar tipos de datos correctos
-    if 'precio' in product:
+    if 'precio' in product and product['precio'] is not None:
         product['precio'] = Decimal(str(product['precio']))
-    if 'precio_original' in product:
+    if 'precio_original' in product and product['precio_original'] is not None:
         product['precio_original'] = Decimal(str(product['precio_original']))
+    else:
+        product['precio_original'] = product.get('precio')
     
     # 2. Obtener productos relacionados (de la misma categoría)
     related_products = []
@@ -293,6 +366,9 @@ def product_detail(request, slug):
         'related_products': related_products,
         'error': None  # Para el manejo de errores en la plantilla
     }
+    
+    end_time = time.time()
+    logger.info(f"Tiempo total de carga detalle producto {slug}: {end_time - start_time:.2f} segundos")
     return render(request, 'storefront/shop/product_detail.html', context)
 
 

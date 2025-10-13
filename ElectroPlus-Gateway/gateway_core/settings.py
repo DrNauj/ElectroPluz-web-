@@ -44,6 +44,18 @@ MICROSERVICES = {
     }
 }
 
+# Configuración de Caché
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': BASE_DIR / 'django_cache',
+        'TIMEOUT': 300,  # 5 minutos
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000
+        }
+    }
+}
+
 # Application definition
 
 INSTALLED_APPS = [

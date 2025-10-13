@@ -52,17 +52,23 @@ class ProductoViewSet(viewsets.ModelViewSet):
             )
     
     def get_queryset(self):
-        """Personalizar el queryset base con filtros y búsqueda."""
+        """Personalizar el queryset base con filtros y búsqueda optimizada."""
         queryset = super().get_queryset()
         
         # Obtener parámetros de consulta
-        busqueda = self.request.query_params.get('busqueda', None)
-        categoria = self.request.query_params.get('categoria', None)
-        precio_min = self.request.query_params.get('precio_min', None)
-        precio_max = self.request.query_params.get('precio_max', None)
-        con_descuento = self.request.query_params.get('con_descuento', None)
-        ordering = self.request.query_params.get('ordering', None)
-        exclude = self.request.query_params.get('exclude', None)
+        params = self.request.query_params
+        busqueda = params.get('busqueda', None)
+        categoria = params.get('categoria', None)
+        precio_min = params.get('precio_min', None)
+        precio_max = params.get('precio_max', None)
+        con_descuento = params.get('con_descuento', None)
+        ordering = params.get('ordering', None)
+        exclude = params.get('exclude', None)
+        limit = params.get('limit', None)
+        
+        # Optimizar consulta con select_related solo si es necesario
+        if not hasattr(queryset, '_prefetch_done'):
+            queryset = queryset.select_related('categoria', 'proveedor')
         
         # Aplicar búsqueda por nombre o descripción
         if busqueda:
