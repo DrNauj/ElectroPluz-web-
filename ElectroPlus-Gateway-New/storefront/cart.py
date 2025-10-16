@@ -15,7 +15,8 @@ class Cart:
                 'quantity': 0,
                 'price': str(product.price),
                 'name': product.name,
-                'image': product.image
+                'image': product.image,
+                'id': product_id
             }
         if update_quantity:
             self.cart[product_id]['quantity'] = quantity
@@ -33,8 +34,9 @@ class Cart:
             self.save()
 
     def __iter__(self):
-        for item in self.cart.values():
+        for product_id, item in self.cart.items():
             item['total_price'] = Decimal(item['price']) * item['quantity']
+            item['id'] = product_id
             yield item
 
     def __len__(self):

@@ -34,6 +34,23 @@ class ClienteViewSet(viewsets.ModelViewSet):
     queryset = Cliente.objects.all()
     serializer_class = ClienteSerializer
 
+    @action(detail=False, methods=['get'])
+    def pedidos(self, request):
+        """
+        Obtener pedidos de un cliente específico.
+        """
+        cliente_id = request.query_params.get('cliente_id')
+        if not cliente_id:
+            return Response(
+                {'message': 'cliente_id es requerido'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Obtener ventas del cliente
+        ventas = Venta.objects.filter(cliente_id=cliente_id).order_by('-fecha_venta')
+        serializer = VentaSerializer(ventas, many=True)
+        return Response(serializer.data)
+
 class VentaViewSet(viewsets.ModelViewSet):
     """
     ViewSet para gestionar ventas.

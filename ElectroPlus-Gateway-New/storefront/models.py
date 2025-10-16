@@ -74,6 +74,7 @@ class Order(models.Model):
     
     # Información de pago
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    external_sale_id = models.CharField(max_length=100, blank=True, null=True, help_text="ID de la venta en el microservicio de Ventas")
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     notes = models.TextField(blank=True)

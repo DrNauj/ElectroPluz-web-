@@ -60,6 +60,42 @@
                     </form>
                 </div>
             </div>
+
+            <!-- Historial de Pedidos -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Historial de Pedidos</h5>
+                </div>
+                <div class="card-body">
+                    {% if orders %}
+                        {% for order in orders %}
+                        <div class="border-bottom pb-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">Pedido #{{ order.id }}</h6>
+                                    <small class="text-muted">{{ order.fecha_venta|date:"d/m/Y H:i" }}</small>
+                                </div>
+                                <span class="badge {% if order.estado == 'Pendiente' %}bg-warning{% elif order.estado == 'Entregado' %}bg-success{% elif order.estado == 'Cancelado' %}bg-danger{% else %}bg-info{% endif %}">
+                                    {{ order.estado }}
+                                </span>
+                            </div>
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    Total: S/. {{ order.total }} |
+                                    Cliente: {{ order.cliente_nombre }}
+                                </small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        <div class="text-center mt-3">
+                            <a href="{% url 'storefront:order_history' %}" class="btn btn-outline-primary btn-sm">Ver Todos los Pedidos</a>
+                        </div>
+                    {% else %}
+                        <p class="text-muted mb-0">No tienes pedidos realizados aún.</p>
+                        <a href="{% url 'storefront:product_list' %}" class="btn btn-primary btn-sm mt-2">Empezar a Comprar</a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>

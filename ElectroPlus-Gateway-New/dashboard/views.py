@@ -69,6 +69,10 @@ def claims_update_status(request, pk):
 @login_required
 @staff_required
 def dashboard_home(request):
+    # Verificar que el usuario no sea cliente
+    if request.user.role == 'CUSTOMER':
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Acceso denegado. Los clientes no pueden acceder al dashboard.")
     # Estadísticas generales
     total_orders = Order.objects.count()
     total_customers = CustomUser.objects.filter(is_staff=False).count()

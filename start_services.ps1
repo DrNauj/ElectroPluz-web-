@@ -202,7 +202,7 @@ if (-not (Start-DjangoService -serviceName "M-Ventas" -path $ventasPath -port $V
 }
 
 # Iniciar Gateway
-$gatewayPath = Join-Path $BASE_DIR "ElectroPlus-Gateway"
+$gatewayPath = Join-Path $BASE_DIR "ElectroPlus-Gateway-New"
 if (-not (Start-DjangoService -serviceName "Gateway" -path $gatewayPath -port $GATEWAY_PORT -secretKeyVar "GATEWAY_SECRET_KEY")) {
     exit 1
 }

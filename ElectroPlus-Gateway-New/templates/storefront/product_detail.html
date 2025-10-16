@@ -1,56 +1,337 @@
 {% extends 'base.html' %}
 {% load django_bootstrap5 %}
 
-{% block title %}{{ product.name }} - ElectroPlus{% endblock %}
+{% block title %}{{ product.nombre }} - ElectroPlus{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb">
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" class="mb-4">
     <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="{% url 'product_list' %}">Productos</a></li>
-        <li class="breadcrumb-item active">{{ product.name }}</li>
+        <li class="breadcrumb-item"><a href="{% url 'storefront:product_list' %}">Inicio</a></li>
+        {% if product.categoria %}
+        <li class="breadcrumb-item"><a href="?category={{ product.categoria.slug }}">{{ product.categoria.nombre }}</a></li>
+        {% endif %}
+        <li class="breadcrumb-item active">{{ product.nombre }}</li>
     </ol>
 </nav>
 
 <div class="row">
-    <div class="col-md-6">
-        <img src="{{ product.image }}" class="img-fluid rounded" alt="{{ product.name }}">
-    </div>
-    <div class="col-md-6">
-        <h1 class="mb-3">{{ product.name }}</h1>
-        <p class="lead">{{ product.description }}</p>
-        
-        <div class="card mb-3">
-            <div class="card-body">
-                <h3 class="text-success mb-3">S/. {{ product.price }}</h3>
-                <p class="mb-2">
-                    <i class="bi bi-box-seam"></i>
-                    Stock disponible: {{ product.stock }}
-                </p>
-                
-                <form method="post" action="{% url 'storefront:add_to_cart' product.id %}" class="mt-4">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label for="quantity" class="form-label">Cantidad</label>
-                        <input type="number" class="form-control" id="quantity" name="quantity" 
-                               value="1" min="1" max="{{ product.stock }}">
-                    </div>
-                    <button type="submit" class="btn btn-primary btn-lg w-100">
-                        <i class="bi bi-cart-plus"></i> Añadir al Carrito
-                    </button>
-                </form>
+    <!-- Imagen del producto -->
+    <div class="col-lg-6 mb-4">
+        <div class="product-image-container">
+            <img src="{{ product.imagen|default:'https://via.placeholder.com/600x400?text=Producto' }}" class="img-fluid rounded shadow" alt="{{ product.nombre }}" id="main-product-image">
+            {% if product.con_descuento %}
+            <span class="badge bg-danger position-absolute top-0 start-0 m-3 fs-6">¡Oferta!</span>
+            {% endif %}
+        </div>
+
+        <!-- Galería de imágenes (placeholder) -->
+        <div class="row mt-3 g-2">
+            <div class="col-3">
+                <img src="{{ product.imagen|default:'https://via.placeholder.com/150x150?text=Imagen+1' }}" class="img-fluid rounded cursor-pointer" alt="Vista 1" onclick="changeImage(this.src)">
+            </div>
+            <div class="col-3">
+                <img src="https://via.placeholder.com/150x150?text=Imagen+2" class="img-fluid rounded cursor-pointer" alt="Vista 2" onclick="changeImage(this.src)">
+            </div>
+            <div class="col-3">
+                <img src="https://via.placeholder.com/150x150?text=Imagen+3" class="img-fluid rounded cursor-pointer" alt="Vista 3" onclick="changeImage(this.src)">
+            </div>
+            <div class="col-3">
+                <img src="https://via.placeholder.com/150x150?text=Imagen+4" class="img-fluid rounded cursor-pointer" alt="Vista 4" onclick="changeImage(this.src)">
             </div>
         </div>
-        
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Características principales</h5>
-                <ul class="list-unstyled">
-                    <li><i class="bi bi-check-circle-fill text-success"></i> Garantía de 12 meses</li>
-                    <li><i class="bi bi-check-circle-fill text-success"></i> Envío a todo el país</li>
-                    <li><i class="bi bi-check-circle-fill text-success"></i> Soporte técnico especializado</li>
-                </ul>
+    </div>
+
+    <!-- Información del producto -->
+    <div class="col-lg-6">
+        <div class="product-info">
+            <h1 class="mb-3">{{ product.nombre }}</h1>
+
+            <!-- Rating -->
+            {% if product.calificacion_promedio %}
+            <div class="mb-3">
+                <div class="d-flex align-items-center mb-2">
+                    {% for i in "12345"|make_list %}
+                    <i class="fas fa-star {% if forloop.counter <= product.calificacion_promedio %}text-warning{% else %}text-muted{% endif %}"></i>
+                    {% endfor %}
+                    <span class="ms-2">{{ product.calificacion_promedio|floatformat:1 }}</span>
+                    <small class="text-muted ms-2">({{ product.numero_resenas }} reseñas)</small>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Precio -->
+            <div class="price-section mb-4">
+                {% if product.precio_original and product.precio_original > product.precio %}
+                <div class="d-flex align-items-center mb-2">
+                    <span class="h2 text-success mb-0 me-3">S/. {{ product.precio }}</span>
+                    <span class="h5 text-muted text-decoration-line-through mb-0">S/. {{ product.precio_original }}</span>
+                    <span class="badge bg-danger ms-3">
+                        - {% widthratio product.precio_original product.precio 100 %} %
+                    </span>
+                </div>
+                {% else %}
+                <span class="h2 text-success mb-3 d-block">S/. {{ product.precio }}</span>
+                {% endif %}
+            </div>
+
+            <!-- Stock y envío -->
+            <div class="product-meta mb-4">
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-box text-success me-2"></i>
+                            <div>
+                                <small class="text-muted d-block">Stock</small>
+                                <span class="{% if product.stock > 10 %}text-success{% elif product.stock > 0 %}text-warning{% else %}text-danger{% endif %}">
+                                    {% if product.stock > 10 %}Disponible{% elif product.stock > 0 %}Últimas unidades{% else %}Agotado{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-truck text-primary me-2"></i>
+                            <div>
+                                <small class="text-muted d-block">Envío</small>
+                                <span class="text-primary">Gratis</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Descripción -->
+            <div class="product-description mb-4">
+                <h5>Descripción</h5>
+                <p class="text-muted">{{ product.descripcion }}</p>
+            </div>
+
+            <!-- Añadir al carrito -->
+            {% if product.stock > 0 %}
+            <form method="post" action="{% url 'storefront:cart_add' product.slug %}" class="mb-4" id="add-to-cart-form">
+                {% csrf_token %}
+                <div class="row g-3 align-items-end">
+                    <div class="col-sm-4">
+                        <label for="quantity" class="form-label">Cantidad</label>
+                        <div class="input-group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="changeQuantity(-1)">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <input type="number" class="form-control text-center" id="quantity" name="quantity"
+                                   value="1" min="1" max="{{ product.stock }}" readonly>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="changeQuantity(1)">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-sm-8">
+                        <button type="submit" class="btn btn-primary w-100 btn-lg" id="add-to-cart-btn">
+                            <i class="fas fa-cart-plus me-2"></i>Añadir al Carrito
+                        </button>
+                    </div>
+                </div>
+                <div id="cart-message" class="mt-2" style="display: none;"></div>
+            </form>
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Producto agotado temporalmente
+            </div>
+            {% endif %}
+
+            <!-- Características -->
+            <div class="product-features">
+                <h5>¿Por qué elegirnos?</h5>
+                <div class="row g-3">
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-shield-alt text-success me-2"></i>
+                            <small>Garantía de 12 meses</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-truck text-primary me-2"></i>
+                            <small>Envío a todo el país</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-headset text-info me-2"></i>
+                            <small>Soporte técnico 24/7</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-undo text-warning me-2"></i>
+                            <small>Devoluciones gratis</small>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Productos relacionados -->
+<div class="row mt-5">
+    <div class="col-12">
+        <h3 class="mb-4">Productos relacionados</h3>
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-4 g-4">
+            <!-- Placeholder para productos relacionados -->
+            {% for i in "1234"|make_list %}
+            <div class="col">
+                <div class="card h-100 shadow-sm">
+                    <img src="https://via.placeholder.com/250x200?text=Producto+{{ i }}" class="card-img-top" alt="Producto {{ i }}">
+                    <div class="card-body">
+                        <h6 class="card-title">Producto Relacionado {{ i }}</h6>
+                        <p class="card-text small text-muted">Descripción breve del producto.</p>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-success fw-bold">S/. 299.99</span>
+                            <a href="#" class="btn btn-outline-primary btn-sm">Ver</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<style>
+.product-image-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.375rem;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.cursor-pointer:hover {
+    opacity: 0.8;
+}
+
+.product-info h1 {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.price-section {
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 1rem;
+}
+
+.product-meta {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.375rem;
+}
+
+.product-features h5 {
+    color: #495057;
+    margin-bottom: 1rem;
+}
+
+.product-features small {
+    color: #6c757d;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: box-shadow 0.2s;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+</style>
+
+<script>
+function changeImage(src) {
+    document.getElementById('main-product-image').src = src;
+}
+
+function changeQuantity(delta) {
+    const quantityInput = document.getElementById('quantity');
+    const currentValue = parseInt(quantityInput.value);
+    const maxValue = parseInt(quantityInput.max);
+    const newValue = Math.max(1, Math.min(maxValue, currentValue + delta));
+    quantityInput.value = newValue;
+}
+
+// Auto-submit form on sort change
+document.addEventListener('DOMContentLoaded', function() {
+    // Add to cart form handling
+    const addToCartForm = document.getElementById('add-to-cart-form');
+    if (addToCartForm) {
+        addToCartForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent default form submission
+
+            const submitBtn = document.getElementById('add-to-cart-btn');
+            const originalText = submitBtn.innerHTML;
+            const cartMessage = document.getElementById('cart-message');
+
+            // Show loading state
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Agregando...';
+            submitBtn.disabled = true;
+            cartMessage.style.display = 'none';
+
+            // Prepare form data
+            const formData = new FormData(this);
+
+            // Send AJAX request
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Reset button
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+
+                // Show message
+                cartMessage.style.display = 'block';
+                if (data.success) {
+                    cartMessage.className = 'alert alert-success mt-2';
+                    cartMessage.innerHTML = '<i class="fas fa-check me-2"></i>' + data.message;
+
+                    // Update cart badge
+                    const cartBadge = document.getElementById('cart-badge');
+                    if (cartBadge) {
+                        cartBadge.textContent = data.cart_total;
+                    }
+
+                    // Hide message after 3 seconds
+                    setTimeout(() => {
+                        cartMessage.style.display = 'none';
+                    }, 3000);
+                } else {
+                    cartMessage.className = 'alert alert-danger mt-2';
+                    cartMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>' + data.message;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // Reset button
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+
+                // Show error message
+                cartMessage.style.display = 'block';
+                cartMessage.className = 'alert alert-danger mt-2';
+                cartMessage.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Error al agregar al carrito. Inténtalo de nuevo.';
+            });
+        });
+    }
+});
+</script>
 {% endblock %}

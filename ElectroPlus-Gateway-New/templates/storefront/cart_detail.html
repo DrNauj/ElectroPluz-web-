@@ -6,7 +6,10 @@
 {% block content %}
 <div class="container">
     <h2 class="mb-4">Carrito de Compras</h2>
-    
+
+    {% csrf_token %}
+    <div id="cart-messages" class="mb-3"></div>
+
     {% if cart|length > 0 %}
         <div class="row">
             <div class="col-md-8">
@@ -27,19 +30,21 @@
                                     <tr>
                                         <td>
                                             <div class="d-flex align-items-center">
-                                                <img src="{{ item.image }}" alt="{{ item.name }}" 
+                                                <img src="{{ item.image }}" alt="{{ item.name }}"
                                                      class="img-thumbnail me-3" style="width: 50px;">
                                                 {{ item.name }}
                                             </div>
                                         </td>
                                         <td>
-                                            <input type="number" value="{{ item.quantity }}" 
-                                                   min="1" class="form-control" style="width: 80px;">
+                                            <input type="number" value="{{ item.quantity }}"
+                                                   min="1" class="form-control quantity-input"
+                                                   style="width: 80px;"
+                                                   data-product-id="{{ item.id }}">
                                         </td>
                                         <td>S/. {{ item.price }}</td>
-                                        <td>S/. {{ item.total_price }}</td>
+                                        <td class="item-total">S/. {{ item.total_price }}</td>
                                         <td>
-                                            <a href="{% url 'storefront:cart_remove' item.id %}" 
+                                            <a href="{% url 'storefront:cart_remove' item.id %}"
                                                class="btn btn-danger btn-sm">
                                                 <i class="bi bi-trash"></i>
                                             </a>
@@ -51,7 +56,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-body">
@@ -59,7 +64,7 @@
                         <table class="table">
                             <tr>
                                 <td>Subtotal</td>
-                                <td class="text-end">S/. {{ cart.get_total_price }}</td>
+                                <td class="text-end cart-subtotal">S/. {{ cart.get_total_price }}</td>
                             </tr>
                             <tr>
                                 <td>Envío</td>
@@ -67,7 +72,7 @@
                             </tr>
                             <tr class="table-active fw-bold">
                                 <td>Total</td>
-                                <td class="text-end">S/. {{ cart.get_total_price }}</td>
+                                <td class="text-end cart-total">S/. {{ cart.get_total_price }}</td>
                             </tr>
                         </table>
                         <button class="btn btn-primary w-100">
@@ -88,4 +93,72 @@
         </div>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const quantityInputs = document.querySelectorAll('.quantity-input');
+    const cartMessages = document.getElementById('cart-messages');
+
+    quantityInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const productId = this.getAttribute('data-product-id');
+            const quantity = parseInt(this.value);
+
+            if (quantity < 1) {
+                this.value = 1;
+                return;
+            }
+
+            // Send AJAX request to update cart
+            fetch(`/tienda/carrito/actualizar/${productId}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: `quantity=${quantity}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Update the item total in the table
+                    const row = input.closest('tr');
+                    const itemTotalCell = row.querySelector('.item-total');
+                    itemTotalCell.textContent = `S/. ${data.item_total}`;
+
+                    // Update cart totals
+                    document.querySelector('.cart-subtotal').textContent = `S/. ${data.total_price}`;
+                    document.querySelector('.cart-total').textContent = `S/. ${data.total_price}`;
+
+                    // Show success message
+                    showMessage('Carrito actualizado exitosamente', 'success');
+                } else {
+                    showMessage('Error al actualizar el carrito', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('Error al actualizar el carrito', 'danger');
+            });
+        });
+    });
+
+    function showMessage(message, type) {
+        cartMessages.innerHTML = `
+            <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            const alert = cartMessages.querySelector('.alert');
+            if (alert) {
+                alert.remove();
+            }
+        }, 3000);
+    }
+});
+</script>
 {% endblock %}

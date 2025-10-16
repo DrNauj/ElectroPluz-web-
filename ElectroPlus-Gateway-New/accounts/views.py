@@ -11,7 +11,7 @@ def login_view(request):
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            next_url = request.GET.get('next', 'product_list')
+            next_url = request.GET.get('next', 'storefront:product_list')
             return JsonResponse({
                 'success': True,
                 'redirect_url': next_url,
@@ -32,7 +32,7 @@ def register_view(request):
             login(request, user)
             return JsonResponse({
                 'success': True,
-                'redirect_url': 'product_list',
+                'redirect_url': 'storefront:product_list',
                 'message': '¡Registro exitoso! Bienvenido a ElectroPlus'
             })
         else:
@@ -46,4 +46,4 @@ def register_view(request):
 def logout_view(request):
     logout(request)
     messages.success(request, '¡Hasta pronto!')
-    return redirect('product_list')
+    return redirect('storefront:product_list')

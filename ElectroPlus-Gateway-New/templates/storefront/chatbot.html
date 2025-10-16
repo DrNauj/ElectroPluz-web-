@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Chatbot de Atención al Cliente - ElectroPlus{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-robot"></i> Asistente Virtual ElectroPlus
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div id="chat-messages" class="chat-messages mb-3" style="height: 400px; overflow-y: auto; border: 1px solid #dee2e6; padding: 15px; border-radius: 5px; background-color: #f8f9fa;">
+                        <div class="message bot-message mb-3">
+                            <div class="d-flex">
+                                <div class="bot-avatar me-2">
+                                    <i class="fas fa-robot text-primary"></i>
+                                </div>
+                                <div class="message-content">
+                                    <div class="message-bubble bg-light p-2 rounded">
+                                        ¡Hola! Soy el asistente virtual de ElectroPlus. ¿En qué puedo ayudarte hoy?
+                                    </div>
+                                    <small class="text-muted">{{ now|date:"H:i" }}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="text" id="message-input" class="form-control" placeholder="Escribe tu mensaje aquí..." maxlength="500">
+                        <button class="btn btn-primary" type="button" id="send-button">
+                            <i class="fas fa-paper-plane"></i> Enviar
+                        </button>
+                    </div>
+
+                    <div class="mt-3">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i>
+                            Pregúntame sobre productos, pedidos, envíos, devoluciones y más.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick suggestions -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Preguntas frecuentes:</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-primary btn-sm w-100 mb-2 quick-question" data-question="¿Cuáles son los tiempos de entrega?">
+                                <i class="fas fa-truck"></i> Tiempos de entrega
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm w-100 mb-2 quick-question" data-question="¿Cómo hago un pedido?">
+                                <i class="fas fa-shopping-cart"></i> Cómo hacer pedido
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button class="btn btn-outline-primary btn-sm w-100 mb-2 quick-question" data-question="¿Aceptan devoluciones?">
+                                <i class="fas fa-undo"></i> Devoluciones
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm w-100 mb-2 quick-question" data-question="¿Dónde están ubicados?">
+                                <i class="fas fa-map-marker-alt"></i> Ubicación
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.chat-messages {
+    scroll-behavior: smooth;
+}
+
+.message-bubble {
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.bot-avatar {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #e9ecef;
+    border-radius: 50%;
+}
+
+.user-message {
+    justify-content: flex-end;
+}
+
+.user-message .message-bubble {
+    background-color: #007bff;
+    color: white;
+}
+
+.typing-indicator {
+    display: none;
+    font-style: italic;
+    color: #6c757d;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const chatMessages = document.getElementById('chat-messages');
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+
+    // Función para enviar mensaje
+    function sendMessage() {
+        const message = messageInput.value.trim();
+        if (!message) return;
+
+        // Agregar mensaje del usuario
+        addMessage(message, 'user');
+        messageInput.value = '';
+
+        // Mostrar indicador de escritura
+        showTypingIndicator();
+
+        // Enviar mensaje al servidor
+        fetch('/tienda/api/chatbot/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+            },
+            body: JSON.stringify({ message: message })
+        })
+        .then(response => response.json())
+        .then(data => {
+            hideTypingIndicator();
+            if (data.response) {
+                addMessage(data.response, 'bot');
+            } else {
+                addMessage('Lo siento, hubo un error. Inténtalo de nuevo.', 'bot');
+            }
+        })
+        .catch(error => {
+            hideTypingIndicator();
+            console.error('Error:', error);
+            addMessage('Lo siento, hubo un error de conexión. Inténtalo de nuevo.', 'bot');
+        });
+    }
+
+    // Función para agregar mensaje al chat
+    function addMessage(text, sender) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${sender}-message mb-3`;
+
+        const messageContent = `
+            <div class="d-flex ${sender === 'user' ? 'justify-content-end' : ''}">
+                ${sender === 'bot' ? '<div class="bot-avatar me-2"><i class="fas fa-robot text-primary"></i></div>' : ''}
+                <div class="message-content">
+                    <div class="message-bubble ${sender === 'user' ? 'bg-primary text-white' : 'bg-light'} p-2 rounded">
+                        ${text}
+                    </div>
+                    <small class="text-muted">${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'})}</small>
+                </div>
+            </div>
+        `;
+
+        messageDiv.innerHTML = messageContent;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Función para mostrar indicador de escritura
+    function showTypingIndicator() {
+        const indicator = document.createElement('div');
+        indicator.className = 'typing-indicator mb-3';
+        indicator.innerHTML = `
+            <div class="d-flex">
+                <div class="bot-avatar me-2">
+                    <i class="fas fa-robot text-primary"></i>
+                </div>
+                <div class="message-content">
+                    <div class="message-bubble bg-light p-2 rounded">
+                        <i class="fas fa-circle"></i>
+                        <i class="fas fa-circle"></i>
+                        <i class="fas fa-circle"></i>
+                        Escribiendo...
+                    </div>
+                </div>
+            </div>
+        `;
+        indicator.id = 'typing-indicator';
+        chatMessages.appendChild(indicator);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Función para ocultar indicador de escritura
+    function hideTypingIndicator() {
+        const indicator = document.getElementById('typing-indicator');
+        if (indicator) {
+            indicator.remove();
+        }
+    }
+
+    // Event listeners
+    sendButton.addEventListener('click', sendMessage);
+
+    messageInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    // Quick questions
+    document.querySelectorAll('.quick-question').forEach(button => {
+        button.addEventListener('click', function() {
+            const question = this.getAttribute('data-question');
+            messageInput.value = question;
+            sendMessage();
+        });
+    });
+});
+</script>
+{% endblock %}
