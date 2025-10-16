@@ -7,7 +7,7 @@ from django.db.models import Count, Sum, Avg, Q, F
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils.text import slugify
-from storefront.models import Product, Category, Order, Review, Claim, ClaimUpdate
+from storefront.models import Product, Category, Order, Review, Claim, ClaimUpdate, ProductImage
 from accounts.models import CustomUser
 from .models import Branch, Inventory, FinancialTransaction, Budget
 from .reports_views import reports
@@ -249,6 +249,12 @@ def product_create(request):
                 is_active=True
             )
 
+            # Guardar imágenes subidas (campo 'images' soporta múltiples archivos)
+            if request.FILES:
+                images = request.FILES.getlist('images')
+                for f in images:
+                    ProductImage.objects.create(product=product, image=f)
+
             return JsonResponse({
                 'success': True,
                 'id': product.id,
@@ -319,6 +325,12 @@ def product_edit(request, pk):
             product.is_active = data.get('is_active', '1') == '1'
             product.save()
 
+            # Guardar imágenes nuevas si se suben
+            if request.FILES:
+                images = request.FILES.getlist('images')
+                for f in images:
+                    ProductImage.objects.create(product=product, image=f)
+
             return JsonResponse({
                 'success': True,
                 'name': product.name,
@@ -333,9 +345,16 @@ def product_edit(request, pk):
             }, status=400)
 
     categories = Category.objects.all()
+    # Intentar obtener imágenes relacionadas de forma segura (tabla podría no existir si no se aplicaron migraciones)
+    try:
+        product_images = list(product.images.all())
+    except Exception:
+        product_images = []
+
     return render(request, 'dashboard/products/form.html', {
         'product': product,
-        'categories': categories
+        'categories': categories,
+        'product_images': product_images,
     })
 
 @login_required

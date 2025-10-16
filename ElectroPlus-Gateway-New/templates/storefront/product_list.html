@@ -34,7 +34,7 @@
                     </a>
                     {% for category in categories %}
                     <a href="?category={{ category.slug }}{% if search_query %}&q={{ search_query }}{% endif %}{% if ordering %}&sort={{ ordering }}{% endif %}" class="list-group-item list-group-item-action{% if selected_category and selected_category.slug == category.slug %} active{% endif %}">
-                        <i class="fas fa-tag me-2"></i>{{ category.nombre }}
+                        <i class="fas fa-tag me-2"></i>{{ category.name }}
                     </a>
                     {% endfor %}
                 </div>
@@ -93,10 +93,10 @@
                         <label class="me-2">Ordenar:</label>
                         <select class="form-select form-select-sm" name="sort" onchange="this.form.submit()">
                             <option value="-id" {% if ordering == '-id' %}selected{% endif %}>Más recientes</option>
-                            <option value="precio" {% if ordering == 'precio' %}selected{% endif %}>Precio: Menor a Mayor</option>
-                            <option value="-precio" {% if ordering == '-precio' %}selected{% endif %}>Precio: Mayor a Menor</option>
-                            <option value="nombre" {% if ordering == 'nombre' %}selected{% endif %}>Nombre: A-Z</option>
-                            <option value="-nombre" {% if ordering == '-nombre' %}selected{% endif %}>Nombre: Z-A</option>
+                            <option value="price" {% if ordering == 'price' %}selected{% endif %}>Precio: Menor a Mayor</option>
+                            <option value="-price" {% if ordering == '-price' %}selected{% endif %}>Precio: Mayor a Menor</option>
+                            <option value="name" {% if ordering == 'name' %}selected{% endif %}>Nombre: A-Z</option>
+                            <option value="-name" {% if ordering == '-name' %}selected{% endif %}>Nombre: Z-A</option>
                         </select>
                     </div>
                 </div>
@@ -108,26 +108,26 @@
                 <div class="col">
                     <div class="card h-100 shadow-sm product-card">
                         <div class="position-relative">
-                            <img src="{{ product.imagen|default:'https://via.placeholder.com/300x200?text=Producto' }}" class="card-img-top" alt="{{ product.nombre }}" style="height: 200px; object-fit: cover;">
-                            {% if product.con_descuento %}
+                            <img src="{{ product.image|default:'https://via.placeholder.com/300x200?text=Producto' }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                            {% if product.original_price and product.original_price > product.price %}
                             <span class="badge bg-danger position-absolute top-0 end-0 m-2">Oferta</span>
                             {% endif %}
                         </div>
                         <div class="card-body d-flex flex-column">
-                            <h6 class="card-title text-truncate" title="{{ product.nombre }}">{{ product.nombre }}</h6>
-                            <p class="card-text small text-muted flex-grow-1">{{ product.descripcion|truncatechars:80 }}</p>
+                            <h6 class="card-title text-truncate" title="{{ product.name }}">{{ product.name }}</h6>
+                            <p class="card-text small text-muted flex-grow-1">{{ product.description|truncatechars:80 }}</p>
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <div>
-                                    <span class="h5 text-success mb-0">S/. {{ product.precio }}</span>
-                                    {% if product.precio_original %}
-                                    <small class="text-muted text-decoration-line-through">S/. {{ product.precio_original }}</small>
+                                    <span class="h5 text-success mb-0">S/. {{ product.price|floatformat:2 }}</span>
+                                    {% if product.original_price %}
+                                    <small class="text-muted text-decoration-line-through">S/. {{ product.original_price|floatformat:2 }}</small>
                                     {% endif %}
                                 </div>
                                 <div class="text-end">
-                                    {% if product.calificacion_promedio %}
+                                    {% if product.avg_rating %}
                                     <div class="small">
-                                        <i class="fas fa-star text-warning"></i> {{ product.calificacion_promedio|floatformat:1 }}
-                                        <small class="text-muted">({{ product.numero_resenas }})</small>
+                                        <i class="fas fa-star text-warning"></i> {{ product.avg_rating|floatformat:1 }}
+                                        <small class="text-muted">({{ product.review_count }})</small>
                                     </div>
                                     {% endif %}
                                 </div>

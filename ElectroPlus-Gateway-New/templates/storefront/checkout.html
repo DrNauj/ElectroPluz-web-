@@ -48,13 +48,13 @@
                     {% for item in cart %}
                     <div class="d-flex justify-content-between mb-2">
                         <span>{{ item.name }} x {{ item.quantity }}</span>
-                        <span>S/. {{ item.total_price }}</span>
+                        <span>S/. {{ item.total_price|floatformat:2 }}</span>
                     </div>
                     {% endfor %}
                     <hr>
                     <div class="d-flex justify-content-between fw-bold">
                         <span>Total:</span>
-                        <span>S/. {{ cart.get_total_price }}</span>
+                        <span>S/. {{ cart.get_total_price|floatformat:2 }}</span>
                     </div>
                     <button form="checkoutForm" type="submit" class="btn btn-primary w-100 mt-3">
                         Confirmar Pedido
@@ -86,7 +86,7 @@ document.getElementById('checkoutForm').addEventListener('submit', async functio
         const data = await response.json();
         
         if (data.success) {
-            window.location.href = `{% url 'order_history' %}?order=${data.order_id}`;
+            window.location.href = `{% url 'storefront:order_history' %}?order=${data.order_id}`;
         } else {
             alertDiv.style.display = 'block';
             alertDiv.textContent = data.message || 'Ha ocurrido un error. Por favor, intente nuevamente.';

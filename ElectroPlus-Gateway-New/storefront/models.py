@@ -21,6 +21,7 @@ class Product(models.Model):
     category = models.ForeignKey(Category, on_delete=models.CASCADE)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
+    original_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     stock = models.IntegerField()
     min_stock = models.IntegerField(default=5)
     is_active = models.BooleanField(default=True)
@@ -42,6 +43,15 @@ class Product(models.Model):
             self.avg_rating = 0
             self.review_count = 0
         self.save()
+
+
+class ProductImage(models.Model):
+    product = models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE)
+    image = models.ImageField(upload_to='products/%Y/%m', blank=True, null=True)
+    alt_text = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return f'Imagen de {self.product.name} ({self.id})'
 
 
 class Order(models.Model):

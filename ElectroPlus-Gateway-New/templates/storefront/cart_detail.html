@@ -41,8 +41,8 @@
                                                    style="width: 80px;"
                                                    data-product-id="{{ item.id }}">
                                         </td>
-                                        <td>S/. {{ item.price }}</td>
-                                        <td class="item-total">S/. {{ item.total_price }}</td>
+                                        <td>S/. {{ item.price|floatformat:2 }}</td>
+                                        <td class="item-total">S/. {{ item.total_price|floatformat:2 }}</td>
                                         <td>
                                             <a href="{% url 'storefront:cart_remove' item.id %}"
                                                class="btn btn-danger btn-sm">
@@ -64,7 +64,7 @@
                         <table class="table">
                             <tr>
                                 <td>Subtotal</td>
-                                <td class="text-end cart-subtotal">S/. {{ cart.get_total_price }}</td>
+                                <td class="text-end cart-subtotal">S/. {{ cart.get_total_price|floatformat:2 }}</td>
                             </tr>
                             <tr>
                                 <td>Envío</td>
@@ -72,12 +72,12 @@
                             </tr>
                             <tr class="table-active fw-bold">
                                 <td>Total</td>
-                                <td class="text-end cart-total">S/. {{ cart.get_total_price }}</td>
+                                <td class="text-end cart-total">S/. {{ cart.get_total_price|floatformat:2 }}</td>
                             </tr>
                         </table>
-                        <button class="btn btn-primary w-100">
+                        <a href="{% url 'storefront:checkout' %}" class="btn btn-primary w-100">
                             Proceder al Pago
-                        </button>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -99,6 +99,26 @@ document.addEventListener('DOMContentLoaded', function() {
     const quantityInputs = document.querySelectorAll('.quantity-input');
     const cartMessages = document.getElementById('cart-messages');
 
+    // Helper para obtener CSRF desde cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Base URL generada por Django (reemplazaremos el 0 por el id real)
+    const cartUpdateBase = '{% url "storefront:cart_update" 0 %}';
+
     quantityInputs.forEach(input => {
         input.addEventListener('change', function() {
             const productId = this.getAttribute('data-product-id');
@@ -110,18 +130,20 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             // Send AJAX request to update cart
-            fetch(`/tienda/carrito/actualizar/${productId}/`, {
+            const url = cartUpdateBase.replace('0', productId);
+            fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    'X-CSRFToken': csrftoken
                 },
-                body: `quantity=${quantity}`
+                body: `quantity=${encodeURIComponent(quantity)}`
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
                     // Update the item total in the table
+
                     const row = input.closest('tr');
                     const itemTotalCell = row.querySelector('.item-total');
                     itemTotalCell.textContent = `S/. ${data.item_total}`;

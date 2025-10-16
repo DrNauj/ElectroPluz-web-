@@ -24,7 +24,7 @@
                                     <div class="message-bubble bg-light p-2 rounded">
                                         ¡Hola! Soy el asistente virtual de ElectroPlus. ¿En qué puedo ayudarte hoy?
                                     </div>
-                                    <small class="text-muted">{{ now|date:"H:i" }}</small>
+                                        <small class="text-muted">{% now "H:i" %}</small>
                                 </div>
                             </div>
                         </div>
@@ -103,6 +103,22 @@
 .user-message .message-bubble {
     background-color: #007bff;
     color: white;
+    /* Ensanchar la burbuja de usuario y mejorar legibilidad */
+    max-width: 90%;
+    padding: 0.75rem 1rem;
+    word-break: break-word;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    border-radius: 1rem;
+}
+
+.message-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.user-message .message-content {
+    align-items: flex-end;
 }
 
 .typing-indicator {
@@ -117,7 +133,24 @@ document.addEventListener('DOMContentLoaded', function() {
     const messageInput = document.getElementById('message-input');
     const sendButton = document.getElementById('send-button');
     const chatMessages = document.getElementById('chat-messages');
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    // Obtener CSRF desde cookie para evitar depender de un <form> en la plantilla
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    const csrfToken = getCookie('csrftoken');
 
     // Función para enviar mensaje
     function sendMessage() {
@@ -128,11 +161,14 @@ document.addEventListener('DOMContentLoaded', function() {
         addMessage(message, 'user');
         messageInput.value = '';
 
-        // Mostrar indicador de escritura
+        // Mostrar indicador de escritura (si no existe)
         showTypingIndicator();
 
-        // Enviar mensaje al servidor
-        fetch('/tienda/api/chatbot/', {
+        // Desactivar botón para evitar envíos duplicados
+        sendButton.disabled = true;
+
+        // Enviar mensaje al servidor usando URL dinámica
+        fetch('{% url "storefront:chatbot_response" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -140,7 +176,13 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             body: JSON.stringify({ message: message })
         })
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                // Intentar leer JSON con mensaje de error si existe
+                return response.json().then(err => { throw { status: response.status, body: err }; });
+            }
+            return response.json();
+        })
         .then(data => {
             hideTypingIndicator();
             if (data.response) {
@@ -153,6 +195,9 @@ document.addEventListener('DOMContentLoaded', function() {
             hideTypingIndicator();
             console.error('Error:', error);
             addMessage('Lo siento, hubo un error de conexión. Inténtalo de nuevo.', 'bot');
+        })
+        .finally(() => {
+            sendButton.disabled = false;
         });
     }
 
@@ -161,43 +206,70 @@ document.addEventListener('DOMContentLoaded', function() {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${sender}-message mb-3`;
 
-        const messageContent = `
-            <div class="d-flex ${sender === 'user' ? 'justify-content-end' : ''}">
-                ${sender === 'bot' ? '<div class="bot-avatar me-2"><i class="fas fa-robot text-primary"></i></div>' : ''}
-                <div class="message-content">
-                    <div class="message-bubble ${sender === 'user' ? 'bg-primary text-white' : 'bg-light'} p-2 rounded">
-                        ${text}
-                    </div>
-                    <small class="text-muted">${new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'})}</small>
-                </div>
-            </div>
-        `;
+        const container = document.createElement('div');
+        container.className = 'd-flex';
+        if (sender === 'user') container.classList.add('justify-content-end');
 
-        messageDiv.innerHTML = messageContent;
+        if (sender === 'bot') {
+            const avatarWrap = document.createElement('div');
+            avatarWrap.className = 'bot-avatar me-2';
+            const icon = document.createElement('i');
+            icon.className = 'fas fa-robot text-primary';
+            avatarWrap.appendChild(icon);
+            container.appendChild(avatarWrap);
+        }
+
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble p-2 rounded ${sender === 'user' ? 'bg-primary text-white' : 'bg-light'}`;
+        // Usar textContent para evitar XSS
+        bubble.textContent = text;
+
+        const time = document.createElement('small');
+        time.className = 'text-muted';
+        time.textContent = new Date().toLocaleTimeString('es-ES', {hour: '2-digit', minute:'2-digit'});
+
+        messageContent.appendChild(bubble);
+        messageContent.appendChild(time);
+        container.appendChild(messageContent);
+
+        messageDiv.appendChild(container);
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
     // Función para mostrar indicador de escritura
     function showTypingIndicator() {
+        // No crear si ya existe
+        if (document.getElementById('typing-indicator')) return;
+
         const indicator = document.createElement('div');
         indicator.className = 'typing-indicator mb-3';
-        indicator.innerHTML = `
-            <div class="d-flex">
-                <div class="bot-avatar me-2">
-                    <i class="fas fa-robot text-primary"></i>
-                </div>
-                <div class="message-content">
-                    <div class="message-bubble bg-light p-2 rounded">
-                        <i class="fas fa-circle"></i>
-                        <i class="fas fa-circle"></i>
-                        <i class="fas fa-circle"></i>
-                        Escribiendo...
-                    </div>
-                </div>
-            </div>
-        `;
         indicator.id = 'typing-indicator';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'd-flex';
+
+        const avatarWrap = document.createElement('div');
+        avatarWrap.className = 'bot-avatar me-2';
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-robot text-primary';
+        avatarWrap.appendChild(icon);
+
+        const messageContent = document.createElement('div');
+        messageContent.className = 'message-content';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble bg-light p-2 rounded';
+        bubble.textContent = 'Escribiendo...';
+
+        messageContent.appendChild(bubble);
+        wrap.appendChild(avatarWrap);
+        wrap.appendChild(messageContent);
+
+        indicator.appendChild(wrap);
         chatMessages.appendChild(indicator);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
@@ -213,8 +285,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Event listeners
     sendButton.addEventListener('click', sendMessage);
 
-    messageInput.addEventListener('keypress', function(e) {
+    messageInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
+            e.preventDefault();
             sendMessage();
         }
     });

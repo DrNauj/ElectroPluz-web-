@@ -29,7 +29,7 @@
             <div class="card bg-primary text-white">
                 <div class="card-body">
                     <h6 class="card-title">Ventas Totales</h6>
-                    <h3 class="card-text">${{ period_stats.total_revenue|default:"0.00" }}</h3>
+                    <h3 class="card-text">${{ period_stats.total_revenue|default:"0.00"|floatformat:2 }}</h3>
                 </div>
             </div>
         </div>
@@ -53,7 +53,7 @@
             <div class="card bg-warning text-white">
                 <div class="card-body">
                     <h6 class="card-title">Valor Promedio</h6>
-                    <h3 class="card-text">${{ period_stats.avg_order_value|default:"0.00" }}</h3>
+                    <h3 class="card-text">${{ period_stats.avg_order_value|default:"0.00"|floatformat:2 }}</h3>
                 </div>
             </div>
         </div>
@@ -134,7 +134,7 @@
 <script>
 // Datos para las gráficas (serán reemplazados por datos reales de la vista)
 const salesData = {{ sales_data|safe }};
-const topProductsData = {{ top_products_data|safe }};
+const topProductsData = {{ products_data|safe }};
 const claimsData = {{ claims_data|safe }};
 
 // Gráfica de ventas

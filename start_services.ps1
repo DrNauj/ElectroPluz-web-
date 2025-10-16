@@ -109,8 +109,14 @@ $VENTAS_PORT = if ([Environment]::GetEnvironmentVariable("VENTAS_PORT")) {
 # Función para verificar si un puerto está en uso
 function Test-PortInUse {
     param($port)
-    $portInUse = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
-    return $null -ne $portInUse
+    try {
+        $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction Stop
+        return $null -ne $connections
+    }
+    catch {
+        # Si hay error, asumimos que el puerto no está en uso
+        return $false
+    }
 }
 
 # Función para iniciar un servicio Django
@@ -217,8 +223,15 @@ Write-Host "`nEjecutando pruebas de integración..." -ForegroundColor Cyan
 Set-Location $gatewayPath
 # Esperamos unos segundos para asegurar que los servicios estén listos
 Start-Sleep -Seconds 5
-# Ejecutar las pruebas del directorio de integración específicamente
-python manage.py test gateway_app.tests.integration.test_microservices --verbosity=2
+
+# Verificar que los tests existen antes de ejecutarlos
+$testPath = "gateway_app/tests/integration/test_microservices.py"
+if (Test-Path $testPath) {
+    # Ejecutar las pruebas del directorio de integración específicamente
+    python manage.py test gateway_app.tests.integration.test_microservices --verbosity=2
+} else {
+    Write-Host "Tests de integración no encontrados, omitiendo..." -ForegroundColor Yellow
+}
 
 # Verificar estado de los servicios
 function Test-ServiceHealth {

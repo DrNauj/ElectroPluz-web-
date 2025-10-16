@@ -104,17 +104,17 @@
                     <tbody>
                         {% for item in order.items.all %}
                         <tr>
-                            <td>{{ item.product.name }}</td>
-                            <td>${{ item.price }}</td>
+                            <td>{{ item.product_name }}</td>
+                            <td>S/. {{ item.product_price|floatformat:2 }}</td>
                             <td>{{ item.quantity }}</td>
-                            <td class="text-end">${{ item.get_total }}</td>
+                            <td class="text-end">S/. {{ item.get_total|floatformat:2 }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
                         <tr>
                             <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
-                            <td class="text-end">${{ order.get_subtotal }}</td>
+                            <td class="text-end">S/. {{ order.get_subtotal|floatformat:2 }}</td>
                         </tr>
                         {% if order.discount %}
                         <tr>
@@ -124,11 +124,11 @@
                         {% endif %}
                         <tr>
                             <td colspan="3" class="text-end"><strong>IVA (19%):</strong></td>
-                            <td class="text-end">${{ order.get_tax }}</td>
+                            <td class="text-end">S/. {{ order.calculate_tax|floatformat:2 }}</td>
                         </tr>
                         <tr>
                             <td colspan="3" class="text-end"><strong>Total:</strong></td>
-                            <td class="text-end"><strong>${{ order.total }}</strong></td>
+                            <td class="text-end"><strong>S/. {{ order.total|floatformat:2 }}</strong></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -146,7 +146,7 @@ function updateOrderStatus(orderId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify({
                 status: newStatus

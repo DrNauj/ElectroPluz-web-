@@ -81,28 +81,29 @@ def reports(request):
         total=Count('id')
     )
 
-    # Datos para gráficos
-    chart_data = {
-        'sales': {
-            'labels': [entry['date'].strftime('%d/%m/%Y') for entry in sales_by_date],
-            'sales': [entry['total_sales'] for entry in sales_by_date],
-            'revenue': [float(entry['total_amount'] or 0) for entry in sales_by_date],
-            'items': [entry['total_items'] or 0 for entry in sales_by_date],
-        },
-        'products': {
-            'labels': [p.name for p in top_products],
-            'sales': [p.total_sales for p in top_products],
-            'revenue': [float(p.total_revenue or 0) for p in top_products],
-        },
-        'categories': {
-            'labels': [c.name for c in top_categories],
-            'sales': [c.total_sales for c in top_categories],
-            'revenue': [float(c.total_revenue or 0) for c in top_categories],
-        },
-        'claims': {
-            'labels': [c['status'] for c in claims_stats],
-            'values': [c['total'] for c in claims_stats],
-        },
+    # Datos para gráficos: construir objetos separados serializables
+    sales_data = {
+        'labels': [entry['date'].strftime('%d/%m/%Y') for entry in sales_by_date],
+        'values': [entry['total_sales'] for entry in sales_by_date],
+        'revenue': [float(entry['total_amount'] or 0) for entry in sales_by_date],
+        'items': [int(entry['total_items'] or 0) for entry in sales_by_date],
+    }
+
+    products_data = {
+        'labels': [p.name for p in top_products],
+        'values': [int(p.total_sales or 0) for p in top_products],
+        'revenue': [float(p.total_revenue or 0) for p in top_products],
+    }
+
+    categories_data = {
+        'labels': [c.name for c in top_categories],
+        'values': [int(c.total_sales or 0) for c in top_categories],
+        'revenue': [float(c.total_revenue or 0) for c in top_categories],
+    }
+
+    claims_data = {
+        'labels': [c['status'] for c in claims_stats],
+        'values': [int(c['total']) for c in claims_stats],
     }
 
     # Indicadores de bajo stock
@@ -110,10 +111,17 @@ def reports(request):
         stock__lt=F('min_stock')
     ).order_by('stock')[:10]
 
+    # Etiqueta legible del periodo
+    period_labels = {'today': 'Hoy', 'week': 'Última semana', 'month': 'Último mes', 'year': 'Último año'}
+
     context = {
         'period': period,
+        'period_label': period_labels.get(period, 'Último mes'),
         'period_stats': period_stats,
-        'chart_data': json.dumps(chart_data),
+        'sales_data': json.dumps(sales_data),
+        'products_data': json.dumps(products_data),
+        'categories_data': json.dumps(categories_data),
+        'claims_data': json.dumps(claims_data),
         'top_products': top_products,
         'top_categories': top_categories,
         'low_stock_products': low_stock_products,

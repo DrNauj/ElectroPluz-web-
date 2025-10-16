@@ -28,6 +28,10 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+# API Configuration
+INVENTORY_API_URL = 'http://localhost:8001/api'
+SALES_API_URL = 'http://localhost:8002/api'
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -151,3 +155,7 @@ MICROSERVICES = {
         'API_KEY': 'dev-key',
     }
 }
+
+# Media files (uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

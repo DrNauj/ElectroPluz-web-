@@ -33,7 +33,7 @@
                             <td>{{ product.id }}</td>
                             <td>{{ product.name }}</td>
                             <td>{{ product.category.name }}</td>
-                            <td>${{ product.price }}</td>
+                            <td>${{ product.price|floatformat:2 }}</td>
                             <td>{{ product.stock }}</td>
                             <td>
                                 {% if product.stock > 0 %}
@@ -68,12 +68,27 @@
 
 {% block extra_js %}
 <script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
 function deleteProduct(productId) {
     if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
         fetch(`/dashboard/productos/${productId}/eliminar/`, {
             method: 'POST',
             headers: {
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                'X-CSRFToken': getCookie('csrftoken')
             }
         })
         .then(response => response.json())

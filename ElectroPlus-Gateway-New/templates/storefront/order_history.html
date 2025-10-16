@@ -42,7 +42,7 @@
                     <div class="col-md-4">
                         <h6>Detalles:</h6>
                         <p class="mb-1"><strong>Fecha:</strong> {{ order.fecha_venta|date:"d/m/Y H:i" }}</p>
-                        <p class="mb-1"><strong>Total:</strong> S/. {{ order.total }}</p>
+                        <p class="mb-1"><strong>Total:</strong> S/. {{ order.total|floatformat:2 }}</p>
                         <p class="mb-1"><strong>Estado:</strong> {{ order.estado }}</p>
                     </div>
                 </div>

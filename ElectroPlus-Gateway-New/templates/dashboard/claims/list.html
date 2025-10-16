@@ -84,7 +84,7 @@ function updateClaimStatus(claimId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                'X-CSRFToken': getCookie('csrftoken')
             },
             body: JSON.stringify({
                 status: newStatus
