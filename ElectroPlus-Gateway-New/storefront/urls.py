@@ -33,4 +33,7 @@ urlpatterns = [
     # Chatbot
     path('chatbot/', views.chatbot, name='chatbot'),
     path('api/chatbot/', views.chatbot_response, name='chatbot_response'),
+    # Reclamos (cliente)
+    path('reclamo/nuevo/', views.claim_create, name='claim_create'),
+    path('reclamo/<int:pk>/', views.claim_detail_public, name='claim_detail'),
 ]

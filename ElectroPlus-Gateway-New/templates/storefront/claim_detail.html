@@ -1,0 +1,24 @@
+{% extends "storefront/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Reclamo {{ claim.code }} (Pedido #{{ claim.order.id }})</h2>
+  <p><strong>Estado:</strong> {{ claim.get_status_display }}</p>
+  <p><strong>Tipo:</strong> {{ claim.get_type_display }}</p>
+  <p><strong>Creado:</strong> {{ claim.created_at|date:"d/m/Y H:i" }}</p>
+  <hr>
+  <h5>Descripción</h5>
+  <p>{{ claim.description|linebreaks }}</p>
+  <hr>
+  <h5>Historial</h5>
+  {% for u in updates %}
+  <div class="mb-3">
+    <strong>{{ u.user.get_full_name }}</strong> <small class="text-muted">{{ u.created_at|date:"d/m/Y H:i" }}</small>
+    <div>{{ u.get_status_display }} - {{ u.comment }}</div>
+  </div>
+  {% empty %}
+  <p class="text-muted">No hay actualizaciones aún.</p>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -12,6 +12,13 @@
 
     <div class="card dashboard-card">
         <div class="card-body">
+            {% if messages %}
+            <div>
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }}" role="alert">{{ message }}</div>
+                {% endfor %}
+            </div>
+            {% endif %}
             <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
                 
@@ -80,10 +87,33 @@
                             <label class="form-label">Imágenes actuales</label>
                             <div class="d-flex flex-wrap gap-2">
                                 {% for img in product_images %}
-                                    <div style="width:96px; height:96px; overflow:hidden; border:1px solid #e9ecef; border-radius:6px;">
+                                    <div style="width:96px; height:96px; overflow:hidden; border:1px solid #e9ecef; border-radius:6px; position:relative;">
                                         {% if img.image and img.image.url %}
                                         <img src="{{ img.image.url }}" alt="{{ img.alt_text }}" style="width:100%; height:100%; object-fit:cover;">
                                         {% endif %}
+                                        <button type="button" class="btn btn-sm btn-danger position-absolute" style="top:4px; right:4px;" onclick="deleteMedia({{ img.id }})">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        {% if product and product.media.all %}
+                        <div class="mb-3">
+                            <label class="form-label">Medios</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for m in product.media.all %}
+                                    <div style="width:120px; height:96px; overflow:hidden; border:1px solid #e9ecef; border-radius:6px; position:relative; padding:6px;">
+                                        {% if m.media_type == 'image' and m.media_file and m.media_file.url %}
+                                            <img src="{{ m.media_file.url }}" alt="{{ m.alt_text }}" style="width:100%; height:100%; object-fit:cover;">
+                                        {% elif m.media_type == 'video' and m.media_file and m.media_file.url %}
+                                            <video src="{{ m.media_file.url }}" style="width:100%; height:100%; object-fit:cover;" controls muted></video>
+                                        {% endif %}
+                                        <button type="button" class="btn btn-sm btn-danger position-absolute" style="top:4px; right:4px;" onclick="deleteMedia({{ m.id }})">
+                                            <i class="bi bi-x-lg"></i>
+                                        </button>
                                     </div>
                                 {% endfor %}
                             </div>
@@ -137,7 +167,7 @@
                     <button type="button" class="btn btn-outline-secondary me-2" onclick="window.history.back()">
                         Cancelar
                     </button>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" id="save-product-btn">
                         {% if product %}Guardar Cambios{% else %}Crear Producto{% endif %}
                     </button>
                 </div>
@@ -145,4 +175,55 @@
         </div>
     </div>
 </div>
+<script>
+// Deshabilitar el botón para evitar envíos dobles
+document.addEventListener('DOMContentLoaded', function(){
+    const form = document.querySelector('form[enctype="multipart/form-data"]');
+    const btn = document.getElementById('save-product-btn');
+    if(form && btn){
+        form.addEventListener('submit', function(){
+            btn.disabled = true;
+            btn.innerHTML = 'Guardando...';
+        });
+    }
+});
+</script>
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function deleteMedia(mediaId) {
+    if (!confirm('¿Eliminar este archivo multimedia?')) return;
+    fetch(`/dashboard/productos/media/${mediaId}/eliminar/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error al eliminar: ' + (data.error || 'error desconocido'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Error al eliminar el archivo.');
+    });
+}
+</script>
 {% endblock %}

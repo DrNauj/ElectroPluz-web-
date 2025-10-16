@@ -6,11 +6,18 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>Gestión de Inventario</h1>
-        {% if perms.dashboard.add_inventory %}
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
-            <i class="bi bi-plus-circle"></i> Agregar Inventario
-        </button>
-        {% endif %}
+        {# Reemplazado temporalmente: Descargar CSV de Reorden (maqueta) #}
+        <a href="{% url 'dashboard:inventory_reorder_csv' %}" class="btn btn-warning me-2">
+            <i class="bi bi-download"></i> Descargar CSV de Reorden (maqueta)
+        </a>
+        <small class="text-muted">(Maqueta: CSV básico con productos cuya cantidad &le; stock mínimo)</small>
+        
+        <!-- Nota para desarrolladores: pendiente completar la gestión de inventario
+             - Implementar columnas supplier/unit_cost en CSV
+             - Añadir acciones: marcar pedido enviado/recibido, historial de ajustes
+             - Notificaciones (email / banner) para stock bajo
+             - Mejorar suggested_qty y reglas por categoría/sucursal
+             Dejar como maqueta por ahora; retomar estos puntos cuando haya tiempo. -->
     </div>
 
     <!-- Filtros -->

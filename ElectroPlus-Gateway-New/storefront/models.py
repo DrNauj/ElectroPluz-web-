@@ -1,4 +1,8 @@
 from django.db import models
+import os
+import uuid
+from django.dispatch import receiver
+from django.db.models.signals import post_delete, pre_save
 from django.contrib.auth import get_user_model
 from decimal import Decimal
 
@@ -47,11 +51,100 @@ class Product(models.Model):
 
 class ProductImage(models.Model):
     product = models.ForeignKey(Product, related_name='images', on_delete=models.CASCADE)
-    image = models.ImageField(upload_to='products/%Y/%m', blank=True, null=True)
+    def product_media_upload_to(instance, filename):
+        base, ext = os.path.splitext(filename)
+        safe = base.replace(' ', '_')
+        unique_name = f"{uuid.uuid4().hex}_{safe}{ext}"
+        if instance.product_id:
+            return os.path.join('products', str(instance.product_id), unique_name)
+        # fallback temporary folder
+        return os.path.join('products', 'tmp', uuid.uuid4().hex, unique_name)
+
+    image = models.ImageField(upload_to=product_media_upload_to, blank=True, null=True)
     alt_text = models.CharField(max_length=255, blank=True)
 
     def __str__(self):
         return f'Imagen de {self.product.name} ({self.id})'
+
+
+class ProductMedia(models.Model):
+    """Modelo genérico para almacenar imágenes o vídeos relacionados a un producto."""
+    MEDIA_TYPE_CHOICES = [
+        ('image', 'Image'),
+        ('video', 'Video'),
+    ]
+    product = models.ForeignKey(Product, related_name='media', on_delete=models.CASCADE)
+    # reuse the same upload_to function to store under products/<id>/
+    media_file = models.FileField(upload_to=ProductImage.product_media_upload_to, blank=True, null=True)
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES, default='image')
+    alt_text = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return f'Media de {self.product.name} ({self.id}) - {self.media_type}'
+
+
+# Signals to delete files when models are deleted or updated
+@receiver(post_delete, sender=ProductImage)
+def delete_productimage_file(sender, instance, **kwargs):
+    try:
+        if instance.image:
+            storage = instance.image.storage
+            if storage.exists(instance.image.name):
+                storage.delete(instance.image.name)
+    except Exception:
+        pass
+
+
+@receiver(pre_save, sender=ProductImage)
+def delete_old_productimage_file(sender, instance, **kwargs):
+    # delete old file when replacing with new one
+    if not instance.pk:
+        return
+    try:
+        old = ProductImage.objects.get(pk=instance.pk)
+    except ProductImage.DoesNotExist:
+        return
+    else:
+        old_file = old.image
+        new_file = instance.image
+        if old_file and old_file.name and (not new_file or old_file.name != new_file.name):
+            try:
+                storage = old_file.storage
+                if storage.exists(old_file.name):
+                    storage.delete(old_file.name)
+            except Exception:
+                pass
+
+
+@receiver(post_delete, sender=ProductMedia)
+def delete_productmedia_file(sender, instance, **kwargs):
+    try:
+        if instance.media_file:
+            storage = instance.media_file.storage
+            if storage.exists(instance.media_file.name):
+                storage.delete(instance.media_file.name)
+    except Exception:
+        pass
+
+
+@receiver(pre_save, sender=ProductMedia)
+def delete_old_productmedia_file(sender, instance, **kwargs):
+    if not instance.pk:
+        return
+    try:
+        old = ProductMedia.objects.get(pk=instance.pk)
+    except ProductMedia.DoesNotExist:
+        return
+    else:
+        old_file = old.media_file
+        new_file = instance.media_file
+        if old_file and old_file.name and (not new_file or old_file.name != new_file.name):
+            try:
+                storage = old_file.storage
+                if storage.exists(old_file.name):
+                    storage.delete(old_file.name)
+            except Exception:
+                pass
 
 
 class Order(models.Model):
@@ -178,6 +271,8 @@ class Claim(models.Model):
 
     order = models.ForeignKey(Order, related_name='claims', on_delete=models.CASCADE)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
+    # Código legible para el cliente / seguimiento (ej: CR-1A2B3C4D)
+    code = models.CharField(max_length=32, unique=True, blank=True, null=True)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES)
     description = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -186,7 +281,20 @@ class Claim(models.Model):
     resolution_notes = models.TextField(blank=True)
 
     def __str__(self):
-        return f'Reclamo #{self.id} - Pedido #{self.order.id}'
+        return f'Reclamo #{self.id} ({self.code}) - Pedido #{self.order.id}'
+
+    def save(self, *args, **kwargs):
+        # Generar código único si no existe
+        if not self.code:
+            import secrets
+            base = 'CR-'
+            # Intentar generar un código único con 8 chars alfanum
+            for _ in range(10):
+                candidate = base + secrets.token_hex(4).upper()
+                if not Claim.objects.filter(code=candidate).exists():
+                    self.code = candidate
+                    break
+        super().save(*args, **kwargs)
 
 
 class ClaimUpdate(models.Model):

@@ -30,7 +30,25 @@
                     <tbody>
                         {% for product in products %}
                         <tr>
-                            <td>{{ product.id }}</td>
+                            <td>
+                                {% with first_img=product.images.all|first %}
+                                    {% if first_img and first_img.image and first_img.image.url %}
+                                        <img src="{{ first_img.image.url }}" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:6px;">
+                                    {% else %}
+                                        {% with first_media=product.media.all|first %}
+                                            {% if first_media and first_media.media_file and first_media.media_file.url %}
+                                                {% if first_media.media_type == 'image' %}
+                                                    <img src="{{ first_media.media_file.url }}" alt="" style="width:48px; height:48px; object-fit:cover; border-radius:6px;">
+                                                {% else %}
+                                                    <video src="{{ first_media.media_file.url }}" style="width:48px; height:48px; object-fit:cover; border-radius:6px;" muted></video>
+                                                {% endif %}
+                                            {% else %}
+                                                {{ product.id }}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
                             <td>{{ product.name }}</td>
                             <td>{{ product.category.name }}</td>
                             <td>${{ product.price|floatformat:2 }}</td>

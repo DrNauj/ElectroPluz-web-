@@ -10,6 +10,11 @@ from django.conf import settings
 from django.core.paginator import Paginator
 from django.contrib import messages
 from .models import Product, Review, Category, Order
+from django.db import transaction
+from django.shortcuts import HttpResponse
+from .models import Claim, ClaimUpdate
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponseForbidden
 from .cart import Cart
 
 def product_list(request):
@@ -72,7 +77,7 @@ def product_list(request):
 def product_detail(request, slug):
     """Vista para mostrar el detalle de un producto."""
     product = get_object_or_404(
-        Product.objects.select_related('category').prefetch_related('reviews'),
+        Product.objects.select_related('category').prefetch_related('reviews', 'images', 'media'),
         slug=slug,
         is_active=True
     )
@@ -84,7 +89,7 @@ def product_detail(request, slug):
     related_products = Product.objects.filter(
         category=product.category,
         is_active=True
-    ).exclude(id=product.id).order_by('?')[:4]  # Selecciona 4 productos aleatorios
+    ).exclude(id=product.id).prefetch_related('images', 'media').order_by('?')[:4]  # Selecciona 4 productos aleatorios
 
     context = {
         'product': product,
@@ -391,37 +396,124 @@ def cart_remove(request, product_id):
     messages.success(request, f'{product.name} removido del carrito.')
     return redirect('storefront:cart_detail')
 
+
+@login_required
+def claim_create(request):
+    """Permite a un cliente autenticado crear un reclamo asociado a un pedido propio."""
+    if request.method == 'POST':
+        order_id = request.POST.get('order_id')
+        type_ = request.POST.get('type')
+        description = request.POST.get('description', '').strip()
+
+        # Validaciones básicas
+        if not order_id or not type_ or not description:
+            messages.error(request, 'Todos los campos son requeridos para crear un reclamo')
+            return redirect(request.META.get('HTTP_REFERER', 'storefront:order_history'))
+
+        try:
+            order = Order.objects.get(id=order_id, user=request.user)
+        except Order.DoesNotExist:
+            messages.error(request, 'Pedido no encontrado o no pertenece al usuario')
+            return redirect('storefront:order_history')
+
+        claim = Claim.objects.create(
+            order=order,
+            user=request.user,
+            type=type_,
+            description=description
+        )
+
+        messages.success(request, f'Reclamo creado correctamente (Código: {claim.code}).')
+        return redirect('storefront:claim_detail', pk=claim.id)
+
+    # GET: mostrar formulario simple para crear reclamo (p. ej. desde historial de pedidos)
+    user_orders = Order.objects.filter(user=request.user).order_by('-created_at')[:20]
+    return render(request, 'storefront/claim_form.html', {'orders': user_orders, 'types': Claim.TYPE_CHOICES})
+
+
+@login_required
+def claim_detail_public(request, pk):
+    claim = get_object_or_404(Claim, pk=pk)
+    # Solo el cliente que lo creó o staff pueden ver
+    if claim.user != request.user and not request.user.is_staff:
+        return HttpResponseForbidden('No tienes permiso para ver este reclamo')
+
+    updates = claim.updates.all().order_by('-created_at')
+    return render(request, 'storefront/claim_detail.html', {'claim': claim, 'updates': updates})
+
 @login_required
 def checkout(request):
     """Vista para el proceso de checkout."""
     cart = Cart(request)
+    print('DEBUG checkout start - session cart:', getattr(request.session, 'get', lambda k: None)('cart'))
 
     if not cart:
         messages.error(request, 'Tu carrito está vacío.')
         return redirect('storefront:product_list')
 
     if request.method == 'POST':
-        # Crear el pedido
-        order = Order.objects.create(
-            user=request.user,
-            total=cart.get_total_price(),
-            status='pending'
-        )
+        print('DEBUG checkout POST keys:', list(request.POST.keys()))
+        # Hacer la creación de orden y decremento de stock en una transacción segura
+        try:
+            with transaction.atomic():
+                # Lock products to avoid race conditions
+                product_ids = [int(item['id']) for item in cart]
+                products_qs = Product.objects.select_for_update().filter(id__in=product_ids)
+                products_map = {p.id: p for p in products_qs}
 
-        # Agregar items del carrito al pedido
-        for item in cart:
-            product = Product.objects.get(id=item['id'])
-            order.items.create(
-                product=product,
-                quantity=item['quantity'],
-                price=product.price
-            )
+                # Validar stock
+                for item in cart:
+                    pid = int(item['id'])
+                    qty = int(item['quantity'])
+                    p = products_map.get(pid)
+                    if not p:
+                        raise ValueError(f'Producto {pid} no encontrado')
+                    if p.stock < qty:
+                        raise ValueError(f'Stock insuficiente para {p.name} (Disponible: {p.stock}, requerido: {qty})')
 
-        # Limpiar el carrito
-        cart.clear()
+                # Crear pedido (incluir método de pago y datos de envío si vienen)
+                order = Order.objects.create(
+                    user=request.user,
+                    payment_method=request.POST.get('payment_method', 'CASH'),
+                    shipping_address=request.POST.get('shipping_address', ''),
+                    shipping_phone=request.POST.get('contact_phone', ''),
+                    status='pending'
+                )
 
-        messages.success(request, f'Pedido #{order.id} creado exitosamente.')
-        return redirect('storefront:order_history')
+                # Crear items y decrementar stock
+                for item in cart:
+                    pid = int(item['id'])
+                    qty = int(item['quantity'])
+                    p = products_map[pid]
+                    order.items.create(
+                        product=p,
+                        quantity=qty,
+                        product_price=p.price
+                    )
+                    # Decrementar stock
+                    p.stock = p.stock - qty
+                    p.save()
+
+                # Actualizar totales del pedido y guardar
+                order.update_totals()
+                order.save()
+
+                # Limpiar el carrito
+                cart.clear()
+                print('DEBUG checkout - order created id', order.id)
+
+            messages.success(request, f'Pedido #{order.id} creado exitosamente.')
+            return redirect('storefront:order_history')
+        except ValueError as ve:
+            print('DEBUG checkout ValueError:', str(ve))
+            messages.error(request, str(ve))
+            return redirect('storefront:cart_detail')
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print('DEBUG checkout Exception:', str(e))
+            messages.error(request, 'Ocurrió un error al procesar el pedido. Intenta de nuevo.')
+            return redirect('storefront:cart_detail')
 
     return render(request, 'storefront/checkout.html', {'cart': cart})
 

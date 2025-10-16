@@ -13,8 +13,8 @@
                 <p class="lead mb-4">Descubre los mejores productos electrónicos con precios increíbles. Calidad garantizada y envío rápido.</p>
                 <a href="#productos" class="btn btn-light btn-lg">Explorar Productos</a>
             </div>
-            <div class="col-lg-6">
-                <img src="https://via.placeholder.com/500x300?text=ElectroPlus+Store" alt="ElectroPlus Store" class="img-fluid rounded">
+            <div class="col-lg-6" style="position: relative;display: flex; justify-content: center; align-items: center;">
+                <img src="\static\img\Electroplus-icon-blackback.png" alt="ElectroPlus Store" class="img-fluid rounded" width="200vw" >
             </div>
         </div>
     </div>
@@ -108,7 +108,20 @@
                 <div class="col">
                     <div class="card h-100 shadow-sm product-card">
                         <div class="position-relative">
-                            <img src="{{ product.image|default:'https://via.placeholder.com/300x200?text=Producto' }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                            {% comment %} Mostrar la primera imagen/media disponible (product.images o product.media), sino product.image, sino placeholder {% endcomment %}
+                            {% with first_img=product.images.first %}
+                                {% if first_img and first_img.image and first_img.image.url %}
+                                    <img src="{{ first_img.image.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                                {% else %}
+                                    {% with first_media=product.media.first %}
+                                        {% if first_media and first_media.media_file and first_media.media_file.url %}
+                                            <img src="{{ first_media.media_file.url }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                                        {% else %}
+                                            <img src="{{ product.image|default:'https://via.placeholder.com/300x200?text=Producto' }}" class="card-img-top" alt="{{ product.name }}" style="height: 200px; object-fit: cover;">
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            {% endwith %}
                             {% if product.original_price and product.original_price > product.price %}
                             <span class="badge bg-danger position-absolute top-0 end-0 m-2">Oferta</span>
                             {% endif %}

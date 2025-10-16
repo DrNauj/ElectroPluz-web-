@@ -34,7 +34,29 @@ class Cart:
             self.save()
 
     def __iter__(self):
+        # Resolve thumbnails and totals on iteration to keep session small
+        from .models import Product
         for product_id, item in self.cart.items():
+            try:
+                product = Product.objects.get(id=product_id)
+            except Exception:
+                product = None
+
+            # Determine thumbnail: prefer ProductImage, then ProductMedia image, then stored item image
+            thumbnail = item.get('image')
+            if product:
+                try:
+                    img = product.images.first()
+                    if img and getattr(img, 'image'):
+                        thumbnail = img.image.url
+                    else:
+                        media_img = product.media.filter(media_type='image').first()
+                        if media_img and getattr(media_img, 'media_file'):
+                            thumbnail = media_img.media_file.url
+                except Exception:
+                    pass
+
+            item['thumbnail'] = thumbnail
             item['total_price'] = Decimal(item['price']) * item['quantity']
             item['id'] = product_id
             yield item

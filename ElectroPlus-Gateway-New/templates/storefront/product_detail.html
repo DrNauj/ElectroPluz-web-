@@ -19,26 +19,42 @@
     <!-- Imagen del producto -->
     <div class="col-lg-6 mb-4">
         <div class="product-image-container">
-            <img src="{{ product.image|default:'https://via.placeholder.com/600x400?text=Producto' }}" class="img-fluid rounded shadow" alt="{{ product.name }}" id="main-product-image">
+            {% with first_img=product.images.first %}
+                {% if first_img and first_img.image and first_img.image.url %}
+                    <img src="{{ first_img.image.url }}" class="img-fluid rounded shadow" alt="{{ product.name }}" id="main-product-image">
+                {% else %}
+                    {% with first_media=product.media.first %}
+                        {% if first_media and first_media.media_file and first_media.media_file.url %}
+                            <img src="{{ first_media.media_file.url }}" class="img-fluid rounded shadow" alt="{{ product.name }}" id="main-product-image">
+                        {% else %}
+                            <img src="{{ product.image|default:'https://via.placeholder.com/600x400?text=Producto' }}" class="img-fluid rounded shadow" alt="{{ product.name }}" id="main-product-image">
+                        {% endif %}
+                    {% endwith %}
+                {% endif %}
+            {% endwith %}
             {% if product.original_price and product.original_price > product.price %}
             <span class="badge bg-danger position-absolute top-0 start-0 m-3 fs-6">¡Oferta!</span>
             {% endif %}
         </div>
 
-        <!-- Galería de imágenes (placeholder) -->
+        <!-- Galería de imágenes -->
         <div class="row mt-3 g-2">
-                <div class="col-3">
-                <img src="{{ product.image|default:'https://via.placeholder.com/150x150?text=Imagen+1' }}" class="img-fluid rounded cursor-pointer" alt="Vista 1" onclick="changeImage(this.src)">
-            </div>
+            {% comment %} Mostrar thumbnails de product.images y product.media {% endcomment %}
+            {% for img in product.images.all %}
             <div class="col-3">
-                <img src="https://via.placeholder.com/150x150?text=Imagen+2" class="img-fluid rounded cursor-pointer" alt="Vista 2" onclick="changeImage(this.src)">
+                {% if img.image and img.image.url %}
+                <img src="{{ img.image.url }}" class="img-fluid rounded cursor-pointer" alt="{{ img.alt_text|default:product.name }}" onclick="changeImage(this.src)">
+                {% endif %}
             </div>
+            {% endfor %}
+
+            {% for m in product.media.all %}
             <div class="col-3">
-                <img src="https://via.placeholder.com/150x150?text=Imagen+3" class="img-fluid rounded cursor-pointer" alt="Vista 3" onclick="changeImage(this.src)">
+                {% if m.media_type == 'image' and m.media_file and m.media_file.url %}
+                <img src="{{ m.media_file.url }}" class="img-fluid rounded cursor-pointer" alt="{{ m.alt_text|default:product.name }}" onclick="changeImage(this.src)">
+                {% endif %}
             </div>
-            <div class="col-3">
-                <img src="https://via.placeholder.com/150x150?text=Imagen+4" class="img-fluid rounded cursor-pointer" alt="Vista 4" onclick="changeImage(this.src)">
-            </div>
+            {% endfor %}
         </div>
     </div>
 
@@ -182,8 +198,20 @@
             {% for related in related_products %}
             <div class="col">
                 <div class="card h-100 shadow-sm">
-                    <img src="{{ related.image|default:'https://via.placeholder.com/250x200?text=Sin+Imagen' }}" 
-                         class="card-img-top" alt="{{ related.name }}">
+                    {% comment %} Mostrar la primera imagen disponible del producto relacionado: images -> media -> related.image -> placeholder {% endcomment %}
+                    {% with rfirst=related.images.first %}
+                        {% if rfirst and rfirst.image and rfirst.image.url %}
+                            <img src="{{ rfirst.image.url }}" class="card-img-top" alt="{{ related.name }}">
+                        {% else %}
+                            {% with rmedia=related.media.first %}
+                                {% if rmedia and rmedia.media_file and rmedia.media_file.url %}
+                                    <img src="{{ rmedia.media_file.url }}" class="card-img-top" alt="{{ related.name }}">
+                                {% else %}
+                                    <img src="{{ related.image|default:'https://via.placeholder.com/250x200?text=Sin+Imagen' }}" class="card-img-top" alt="{{ related.name }}">
+                                {% endif %}
+                            {% endwith %}
+                        {% endif %}
+                    {% endwith %}
                     {% if related.original_price and related.original_price > related.price %}
                     <span class="badge bg-danger position-absolute top-0 start-0 m-2">¡Oferta!</span>
                     {% endif %}

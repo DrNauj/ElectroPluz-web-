@@ -3,9 +3,13 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from django.core.exceptions import PermissionDenied
 from django.db import models
+from django.db import DatabaseError
+from django.db.utils import OperationalError
+from django.db import IntegrityError
 from django.db.models import Count, Sum, Avg, Q, F
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.contrib import messages
 from django.utils.text import slugify
 from storefront.models import Product, Category, Order, Review, Claim, ClaimUpdate, ProductImage
 from accounts.models import CustomUser
@@ -25,6 +29,23 @@ ROLES = {
     'inventory': ['view_inventory', 'edit_inventory'],
     'support': ['view_claims', 'edit_claims']
 }
+
+
+def generate_unique_slug(model, name, instance_id=None):
+    """Genera un slug único para `model` basado en `name`. Si instance_id se proporciona, la búsqueda excluye esa instancia."""
+    base = slugify(name)
+    slug = base
+    counter = 1
+    qs = model.objects.filter(slug=slug)
+    if instance_id:
+        qs = qs.exclude(pk=instance_id)
+    while qs.exists():
+        slug = f"{base}-{counter}"
+        qs = model.objects.filter(slug=slug)
+        if instance_id:
+            qs = qs.exclude(pk=instance_id)
+        counter += 1
+    return slug
 
 def is_staff(user):
     return user.is_staff
@@ -187,6 +208,9 @@ def product_list(request):
         .filter(query)
         .order_by(sort_field))
 
+    # Prefetch related media to show thumbnails without extra queries
+    products = products.prefetch_related('images', 'media')
+
     categories = Category.objects.all()
 
     return render(request, 'dashboard/products/list.html', {
@@ -207,15 +231,22 @@ def product_create(request):
         raise PermissionDenied
 
     if request.method == 'POST':
+        is_ajax = False
         try:
             data = request.POST.dict()
+            is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest' or ('application/json' in request.META.get('HTTP_ACCEPT', ''))
             
             # Validaciones básicas
             required_fields = ['name', 'category', 'price', 'stock', 'min_stock']
             if not all(data.get(field) for field in required_fields):
+                # debug info: qué keys llegaron y cuantos archivos
+                keys = list(request.POST.keys())
+                files_count = len(request.FILES)
                 return JsonResponse({
                     'success': False,
-                    'error': 'Todos los campos marcados son requeridos'
+                    'error': 'Todos los campos marcados son requeridos',
+                    'debug_post_keys': keys,
+                    'debug_files_count': files_count
                 }, status=400)
 
             # Validar y convertir valores numéricos
@@ -236,30 +267,82 @@ def product_create(request):
                     'error': str(e)
                 }, status=400)
 
-            # Crear el producto
-            product = Product.objects.create(
-                name=data['name'],
-                slug=slugify(data['name']),
-                category_id=data['category'],
-                description=data.get('description', ''),
-                price=price,
-                stock=stock,
-                min_stock=min_stock,
-                image=data.get('image', ''),
-                is_active=True
-            )
+            # Crear el producto con slug único, reintentando si hay race-condition
+            base_slug = slugify(data['name'])
+            attempt = 0
+            product = None
+            while attempt < 5 and product is None:
+                try:
+                    slug_to_use = generate_unique_slug(Product, data['name']) if attempt == 0 else f"{base_slug}-{attempt}"
+                    product = Product.objects.create(
+                        name=data['name'],
+                        slug=slug_to_use,
+                        category_id=data['category'],
+                        description=data.get('description', ''),
+                        price=price,
+                        stock=stock,
+                        min_stock=min_stock,
+                        image=data.get('image', ''),
+                        is_active=True
+                    )
+                except IntegrityError:
+                    product = None
+                    attempt += 1
+            if product is None:
+                return JsonResponse({'success': False, 'error': 'No se pudo generar un slug único para el producto. Intenta con un nombre diferente.'}, status=500)
 
-            # Guardar imágenes subidas (campo 'images' soporta múltiples archivos)
+            # Helper para detectar peticiones AJAX (fetch/XHR)
+            is_ajax = request.headers.get('x-requested-with') == 'XMLHttpRequest' or ('application/json' in request.META.get('HTTP_ACCEPT', ''))
+
+            # Guardar imágenes subidas (aceptar cualquier key en request.FILES)
+            files_received_count = 0
+            files_created_count = 0
             if request.FILES:
-                images = request.FILES.getlist('images')
-                for f in images:
-                    ProductImage.objects.create(product=product, image=f)
+                # Recolectar todos los archivos enviados bajo cualquier nombre
+                uploaded_files = []
+                try:
+                    for key, file_list in request.FILES.lists():
+                        uploaded_files.extend(file_list)
+                except Exception:
+                    # fallback for environments where .lists() behaves differently
+                    for key in request.FILES:
+                        try:
+                            uploaded_files.extend(request.FILES.getlist(key))
+                        except Exception:
+                            uploaded_files.append(request.FILES.get(key))
+                try:
+                    files_received_count = len(uploaded_files)
+                    for f in uploaded_files:
+                        ProductImage.objects.create(product=product, image=f)
+                        files_created_count += 1
+                except (OperationalError, DatabaseError) as db_e:
+                    # Tabla de imágenes no existe o error de BD: informar claramente
+                    msg = 'Error de base de datos al guardar imágenes: parece que la tabla de imágenes no existe. Ejecuta: python manage.py makemigrations storefront; python manage.py migrate'
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'error': msg}, status=500)
+                    else:
+                        messages.error(request, msg)
+                        return redirect(reverse('dashboard:product_edit', args=[product.id]))
+
+            # Additional debug: keys present in request.FILES and content type
+            request_files_keys = list(request.FILES.keys())
+            content_type = request.META.get('CONTENT_TYPE', '')
+            # Si no es AJAX, redirigir al listado del dashboard con mensaje
+            if not is_ajax:
+                messages.success(request, f"Producto '{product.name}' guardado correctamente.")
+                return redirect(reverse('dashboard:product_list'))
 
             return JsonResponse({
                 'success': True,
                 'id': product.id,
                 'name': product.name,
-                'url': reverse('dashboard:product_edit', args=[product.id])
+                'url': reverse('dashboard:product_edit', args=[product.id]),
+                'debug': {
+                    'files_received': files_received_count,
+                    'files_created': files_created_count,
+                    'request_files_keys': request_files_keys,
+                    'content_type': content_type
+                }
             })
 
         except Exception as e:
@@ -283,6 +366,7 @@ def product_edit(request, pk):
     product = get_object_or_404(Product, pk=pk)
 
     if request.method == 'POST':
+        is_ajax = False
         try:
             data = request.POST.dict()
             
@@ -313,29 +397,67 @@ def product_edit(request, pk):
                 }, status=400)
 
             # Actualizar el producto
+            original_name = product.name
+            # Si el nombre cambia, generar slug único (excluyendo la instancia actual)
+            if data['name'] and data['name'] != original_name:
+                product.slug = generate_unique_slug(Product, data['name'], instance_id=product.id)
             product.name = data['name']
-            if product.name != data['name']:  # Solo actualizar slug si cambió el nombre
-                product.slug = slugify(data['name'])
             product.category_id = data['category']
             product.description = data.get('description', '')
             product.price = price
             product.stock = stock
             product.min_stock = min_stock
             product.image = data.get('image', '')
-            product.is_active = data.get('is_active', '1') == '1'
+            # El checkbox HTML suele enviar 'on' si está marcado. Aceptar varios valores truthy.
+            is_active_val = str(data.get('is_active', '1')).lower()
+            product.is_active = is_active_val in ['1', 'true', 'on', 'yes']
             product.save()
 
             # Guardar imágenes nuevas si se suben
+            files_received_count = 0
+            files_created_count = 0
             if request.FILES:
-                images = request.FILES.getlist('images')
-                for f in images:
-                    ProductImage.objects.create(product=product, image=f)
+                uploaded_files = []
+                try:
+                    for key, file_list in request.FILES.lists():
+                        uploaded_files.extend(file_list)
+                except Exception:
+                    for key in request.FILES:
+                        try:
+                            uploaded_files.extend(request.FILES.getlist(key))
+                        except Exception:
+                            uploaded_files.append(request.FILES.get(key))
+                try:
+                    files_received_count = len(uploaded_files)
+                    for f in uploaded_files:
+                        ProductImage.objects.create(product=product, image=f)
+                        files_created_count += 1
+                except (OperationalError, DatabaseError) as db_e:
+                    msg = 'Error de base de datos al guardar imágenes: parece que la tabla de imágenes no existe. Ejecuta: python manage.py makemigrations storefront; python manage.py migrate'
+                    if is_ajax:
+                        return JsonResponse({'success': False, 'error': msg}, status=500)
+                    else:
+                        messages.error(request, msg)
+                        return redirect(reverse('dashboard:product_edit', args=[product.id]))
 
+            # Si no es AJAX, redirigir al listado con mensaje
+            if not is_ajax:
+                messages.success(request, f"Producto '{product.name}' actualizado correctamente.")
+                return redirect(reverse('dashboard:product_list'))
+
+            request_files_keys = list(request.FILES.keys())
+            content_type = request.META.get('CONTENT_TYPE', '')
             return JsonResponse({
                 'success': True,
                 'name': product.name,
                 'price': str(product.price),
-                'stock': product.stock
+                'stock': product.stock,
+                'debug': {
+                    'files_received': files_received_count,
+                    'files_created': files_created_count,
+                    'request_files_keys': request_files_keys,
+                    'content_type': content_type
+                }
             })
 
         except Exception as e:
@@ -398,6 +520,32 @@ def product_delete(request, pk):
         'success': False,
         'error': 'Método no permitido'
     }, status=405)
+
+
+@login_required
+@staff_required
+def product_media_delete(request, pk):
+    """Eliminar un archivo multimedia (imagen/video) relacionado a un producto."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Método no permitido'}, status=405)
+
+    try:
+        from storefront.models import ProductMedia, ProductImage
+        try:
+            media = ProductMedia.objects.get(pk=pk)
+            media.delete()
+            return JsonResponse({'success': True})
+        except ProductMedia.DoesNotExist:
+            # fallback: maybe it's a ProductImage id
+            try:
+                img = ProductImage.objects.get(pk=pk)
+                img.delete()
+                return JsonResponse({'success': True})
+            except ProductImage.DoesNotExist:
+                return JsonResponse({'success': False, 'error': 'Archivo no encontrado'}, status=404)
+        
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 @login_required
 @staff_required
@@ -839,16 +987,33 @@ def staff_list(request):
 def claims_list(request):
     if not has_role_permission(request.user, 'view_claims'):
         raise PermissionDenied
-        
-    status = request.GET.get('status', 'all')
-    claims = Claim.objects.select_related('order', 'user').all()
     
+    # Parámetros de filtro y búsqueda
+    status = request.GET.get('status', 'all')
+    search = request.GET.get('search', '').strip()
+
+    # Consulta base
+    claims = Claim.objects.select_related('order', 'user').all().order_by('-created_at')
+
     if status != 'all':
         claims = claims.filter(status=status)
-    
+
+    if search:
+        claims = claims.filter(
+            Q(order__user__first_name__icontains=search) |
+            Q(order__user__last_name__icontains=search) |
+            Q(order__id__icontains=search) |
+            Q(description__icontains=search)
+        )
+
+    status_choices = [choice[0] for choice in Claim.STATUS_CHOICES]
+
     return render(request, 'dashboard/claims/list.html', {
         'claims': claims,
-        'can_edit': has_role_permission(request.user, 'edit_claims')
+        'can_edit': has_role_permission(request.user, 'edit_claims'),
+        'status': status,
+        'search': search,
+        'status_choices': status_choices
     })
 
 @login_required
@@ -1093,3 +1258,31 @@ def category_delete(request, pk):
         'success': False,
         'error': 'Método no permitido'
     }, status=405)
+
+
+# Maqueta: CSV de reorden
+@login_required
+@staff_required
+def inventory_reorder_csv(request):
+    """Generar CSV de reorden (maqueta): productos cuyo stock en alguna sucursal <= min_stock."""
+    if not (request.user.is_superuser or has_role_permission(request.user, 'view_inventory')):
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden()
+
+    from django.db.models import F
+    items = Inventory.objects.filter(quantity__lte=F('min_stock')).select_related('product', 'branch')
+
+    import csv
+    from io import StringIO
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(['product_id', 'name', 'category', 'branch', 'current_stock', 'min_stock', 'suggested_qty'])
+
+    for it in items:
+        suggested = max(1, it.min_stock - it.quantity)
+        writer.writerow([it.product.id, it.product.name, getattr(it.product.category, 'name', ''), it.branch.name, it.quantity, it.min_stock, suggested])
+
+    from django.http import HttpResponse
+    resp = HttpResponse(buffer.getvalue(), content_type='text/csv')
+    resp['Content-Disposition'] = 'attachment; filename="reorden_maqueta.csv"'
+    return resp

@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import redirect
+from django.conf import settings
+from django.conf.urls.static import static
 
 def home(request):
     """
@@ -37,3 +39,7 @@ urlpatterns = [
 # URL de login para usar en los templates
 LOGIN_URL = 'accounts:login'
 LOGIN_REDIRECT_URL = 'home'
+
+# Servir archivos media en desarrollo
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

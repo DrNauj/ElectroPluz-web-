@@ -1,0 +1,35 @@
+{% extends "storefront/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Crear Reclamo</h2>
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label for="order_id" class="form-label">Pedido</label>
+      <select name="order_id" id="order_id" class="form-select">
+        {% for order in orders %}
+        <option value="{{ order.id }}">#{{ order.id }} - {{ order.created_at|date:"d/m/Y" }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="type" class="form-label">Tipo</label>
+      <select name="type" id="type" class="form-select">
+        {% for val, label in types %}
+        <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label for="description" class="form-label">Descripción</label>
+      <textarea name="description" id="description" rows="5" class="form-control"></textarea>
+    </div>
+
+    <button class="btn btn-primary" type="submit">Enviar Reclamo</button>
+  </form>
+</div>
+{% endblock %}

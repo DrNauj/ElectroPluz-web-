@@ -13,6 +13,7 @@ urlpatterns = [
     path('productos/crear/', views.product_create, name='product_create'),
     path('productos/<int:pk>/editar/', views.product_edit, name='product_edit'),
     path('productos/<int:pk>/eliminar/', views.product_delete, name='product_delete'),
+    path('productos/media/<int:pk>/eliminar/', views.product_media_delete, name='product_media_delete'),
     
     # Categorías 
     path('categorias/', views.category_list, name='category_list'),
@@ -35,6 +36,7 @@ urlpatterns = [
     
     # Inventario
     path('inventario/', views.inventory_list, name='inventory_list'),
+    path('inventario/reorden/', views.inventory_reorder_csv, name='inventory_reorder_csv'),
     path('inventario/crear/', views.inventory_create, name='inventory_create'),
     path('inventario/actualizar/', views.inventory_update, name='inventory_update'),
     path('inventario/<int:pk>/', views.inventory_detail, name='inventory_detail'),
