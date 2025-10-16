@@ -1,0 +1,187 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block content %}
+{% csrf_token %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Gestión de Inventario</h1>
+        {% if perms.dashboard.add_inventory %}
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addInventoryModal">
+            <i class="bi bi-plus-circle"></i> Agregar Inventario
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Filtros -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="branch" class="form-label">Sucursal</label>
+                    <select class="form-select" id="branch" name="branch">
+                        <option value="">Todas las sucursales</option>
+                        {% for branch in branches %}
+                        <option value="{{ branch.id }}" {% if selected_branch == branch.id %}selected{% endif %}>
+                            {{ branch.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="stock_status" class="form-label">Estado de Stock</label>
+                    <select class="form-select" id="stock_status" name="stock_status">
+                        <option value="">Todos</option>
+                        <option value="low" {% if stock_status == 'low' %}selected{% endif %}>Stock Bajo</option>
+                        <option value="normal" {% if stock_status == 'normal' %}selected{% endif %}>Stock Normal</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Filtrar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabla de Inventario -->
+    <div class="card">
+        <div class="card-body">
+            {% if inventory_items %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Sucursal</th>
+                            <th>Cantidad</th>
+                            <th>Stock Mínimo</th>
+                            <th>Estado</th>
+                            <th>Última Actualización</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in inventory_items %}
+                        <tr {% if item.is_low_stock %}class="table-warning"{% endif %}>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.branch.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.min_stock }}</td>
+                            <td>
+                                {% if item.is_low_stock %}
+                                <span class="badge bg-warning">Stock Bajo</span>
+                                {% else %}
+                                <span class="badge bg-success">Stock Normal</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.last_updated|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {% if perms.dashboard.change_inventory %}
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-primary"
+                                        onclick="editInventory({{ item.id }})">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-center text-muted my-5">No se encontraron registros de inventario.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Agregar/Editar Inventario -->
+<div class="modal fade" id="inventoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Gestionar Inventario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="inventoryForm">
+                    <input type="hidden" id="inventory_id" name="inventory_id">
+                    <div class="mb-3">
+                        <label for="product" class="form-label">Producto</label>
+                        <select class="form-select" id="product" name="product" required>
+                            <option value="">Seleccione un producto</option>
+                            {% for product in products %}
+                            <option value="{{ product.id }}">{{ product.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="branch" class="form-label">Sucursal</label>
+                        <select class="form-select" id="branch" name="branch" required>
+                            <option value="">Seleccione una sucursal</option>
+                            {% for branch in branches %}
+                            <option value="{{ branch.id }}">{{ branch.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Cantidad</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" required min="0">
+                    </div>
+                    <div class="mb-3">
+                        <label for="min_stock" class="form-label">Stock Mínimo</label>
+                        <input type="number" class="form-control" id="min_stock" name="min_stock" required min="1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveInventory()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function editInventory(id) {
+    fetch(`/dashboard/inventario/${id}/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('inventory_id').value = data.id;
+            document.getElementById('product').value = data.product_id;
+            document.getElementById('branch').value = data.branch_id;
+            document.getElementById('quantity').value = data.quantity;
+            document.getElementById('min_stock').value = data.min_stock;
+            
+            new bootstrap.Modal(document.getElementById('inventoryModal')).show();
+        });
+}
+
+function saveInventory() {
+    const form = document.getElementById('inventoryForm');
+    const formData = new FormData(form);
+    
+    fetch('/dashboard/inventario/actualizar/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error al guardar el inventario');
+        }
+    });
+}
+</script>
+{% endblock %}

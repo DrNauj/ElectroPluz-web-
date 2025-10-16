@@ -1,0 +1,183 @@
+{% extends "dashboard/base.html" %}
+{% load i18n static %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Panel de Control</h1>
+
+    <div class="row g-4">
+        <!-- Resumen de Estadísticas -->
+        <div class="col-12">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Total de Pedidos</h5>
+                            <h2>{{ total_orders }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Total de Clientes</h5>
+                            <h2>{{ total_customers }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Total de Productos</h5>
+                            <h2>{{ total_products }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Ventas (30 días)</h5>
+                            <h2>${{ total_sales|floatformat:2 }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alertas de Stock Bajo -->
+        {% if can_view_inventory and low_stock_items %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="card-title mb-0">Alertas de Stock Bajo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for item in low_stock_items %}
+                        <div class="list-group-item">
+                            <h6>{{ item.product.name }}</h6>
+                            <p class="mb-0">Stock: {{ item.quantity }} (Mínimo: {{ item.min_stock }})</p>
+                            <small>Sucursal: {{ item.branch.name }}</small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Estado de Reclamos -->
+        {% if can_view_claims %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Estado de Reclamos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h3>{{ pending_claims }}</h3>
+                                <p>Pendientes</p>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="text-center">
+                                <h3>{{ in_process_claims }}</h3>
+                                <p>En Proceso</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Balance Financiero -->
+        {% if can_view_finances %}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Balance Financiero (Mes Actual)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-success">
+                                <h4>Ingresos</h4>
+                                <h3>${{ monthly_income|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-danger">
+                                <h4>Gastos</h4>
+                                <h3>${{ monthly_expenses|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="{% if monthly_balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                <h4>Balance</h4>
+                                <h3>${{ monthly_balance|floatformat:2 }}</h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Últimos Pedidos -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Últimos Pedidos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for order in latest_orders %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0">Orden #{{ order.id }}</h6>
+                                    <small>{{ order.user.get_full_name }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <h6 class="mb-0">${{ order.total_amount|floatformat:2 }}</h6>
+                                    <small>{{ order.created_at|date:"d/m/Y" }}</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Productos Más Vendidos -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Productos Más Vendidos</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group">
+                        {% for product in top_products %}
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-0">{{ product.name }}</h6>
+                                    <small>{{ product.category.name }}</small>
+                                </div>
+                                <div class="text-end">
+                                    <h6 class="mb-0">{{ product.total_sales }} ventas</h6>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,214 @@
+{% load django_bootstrap5 %}
+{% load cart_tags %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ElectroPlus{% endblock %}</title>
+    {% bootstrap_css %}
+    {% bootstrap_javascript %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="{% static 'css/store.css' %}">
+    <script src="{% static 'js/auth.js' %}"></script>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">ElectroPlus</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'storefront:product_list' %}">Productos</a>
+                    </li>
+                    {% if user.is_authenticated %}
+                        {% if user.is_staff %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'dashboard:home' %}">Dashboard</a>
+                        </li>
+                        {% endif %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'storefront:order_history' %}">Mis Pedidos</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'storefront:wishlist' %}">Lista de Deseos</a>
+                        </li>
+                    {% endif %}
+                </ul>
+                
+                <form class="d-flex me-3" action="{% url 'storefront:product_list' %}" method="get">
+                    <div class="input-group">
+                        <input class="form-control" type="search" placeholder="Buscar productos..." 
+                               name="q" value="{{ request.GET.q|default:'' }}" aria-label="Buscar">
+                        <button class="btn btn-outline-light" type="submit">
+                            <i class="bi bi-search"></i>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="d-flex align-items-center">
+                    <a href="{% url 'storefront:cart_detail' %}" class="btn btn-outline-light me-2 position-relative">
+                        <i class="bi bi-cart3"></i>
+                        <span id="cart-badge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                            {% cart_item_count %}
+                        </span>
+                    </a>
+                    {% if user.is_authenticated %}
+                        <div class="dropdown">
+                            <button class="btn btn-outline-light dropdown-toggle" type="button" 
+                                    data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-person-circle"></i> {{ user.username }}
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{% url 'storefront:profile' %}">
+                                    <i class="bi bi-person-circle"></i> Mi Perfil
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'storefront:order_history' %}">
+                                    <i class="bi bi-clock-history"></i> Mis Pedidos
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'storefront:wishlist' %}">
+                                    <i class="bi bi-heart"></i> Lista de Deseos
+                                </a></li>
+                                {% if user.is_staff %}
+                                <li><a class="dropdown-item" href="{% url 'dashboard:home' %}">
+                                    <i class="bi bi-speedometer2"></i> Dashboard
+                                </a></li>
+                                {% endif %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form action="{% url 'accounts:logout' %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+                                        </button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    {% else %}
+                        <button class="btn btn-outline-light" type="button" data-bs-toggle="modal" data-bs-target="#loginModal">
+                            <i class="bi bi-person"></i> Iniciar Sesión
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Modal de Login -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Iniciar Sesión</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs" id="authTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="login-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#login-pane" type="button" role="tab">
+                                Iniciar Sesión
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="register-tab" data-bs-toggle="tab" 
+                                    data-bs-target="#register-pane" type="button" role="tab">
+                                Registrarse
+                            </button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="authTabsContent">
+                        <div class="tab-pane fade show active p-3" id="login-pane" role="tabpanel">
+                            <form id="loginForm" method="post" action="{% url 'accounts:login' %}">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="username" class="form-label">Usuario</label>
+                                    <input type="text" class="form-control" id="username" name="username" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="password" class="form-label">Contraseña</label>
+                                    <input type="password" class="form-control" id="password" name="password" required>
+                                </div>
+                                <div class="alert alert-danger" style="display: none;" role="alert"></div>
+                                <button type="submit" class="btn btn-primary">Ingresar</button>
+                            </form>
+                        </div>
+                        <div class="tab-pane fade p-3" id="register-pane" role="tabpanel">
+                            <form id="registerForm" method="post" action="{% url 'accounts:register' %}">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label for="reg_username" class="form-label">Usuario</label>
+                                    <input type="text" class="form-control" id="reg_username" name="username" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="reg_email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="reg_email" name="email" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="reg_password1" class="form-label">Contraseña</label>
+                                    <input type="password" class="form-control" id="reg_password1" name="password1" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="reg_password2" class="form-label">Confirmar Contraseña</label>
+                                    <input type="password" class="form-control" id="reg_password2" name="password2" required>
+                                </div>
+                                <div class="alert alert-danger" style="display: none;" role="alert"></div>
+                                <button type="submit" class="btn btn-primary">Registrarse</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="container py-4">
+        {% bootstrap_messages %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5>ElectroPlus</h5>
+                    <p>Tu tienda de confianza para productos electrónicos</p>
+                    <div class="social-links">
+                        <a href="#" class="me-3"><i class="bi bi-facebook"></i></a>
+                        <a href="#" class="me-3"><i class="bi bi-instagram"></i></a>
+                        <a href="#" class="me-3"><i class="bi bi-twitter"></i></a>
+                        <a href="#"><i class="bi bi-linkedin"></i></a>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <h5>Enlaces Rápidos</h5>
+                    <ul class="footer-links">
+                        <li><a href="{% url 'storefront:product_list' %}">Productos</a></li>
+                        <li><a href="{% url 'storefront:order_history' %}">Mis Pedidos</a></li>
+                        <li><a href="{% url 'storefront:wishlist' %}">Lista de Deseos</a></li>
+                        <li><a href="#">Ofertas Especiales</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h5>Atención al Cliente</h5>
+                    <ul class="footer-links">
+                        <li><a href="#">Preguntas Frecuentes</a></li>
+                        <li><a href="#">Política de Devoluciones</a></li>
+                        <li><a href="#">Términos y Condiciones</a></li>
+                        <li><a href="#">Contacto</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom text-center">
+                <hr>
+                <p class="mb-0">© 2025 ElectroPlus. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

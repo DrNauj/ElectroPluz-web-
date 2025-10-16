@@ -54,6 +54,7 @@ class UserDataMiddleware:
         # Crear una instancia de usuario anónimo una sola vez
         self.anonymous_user = type('AnonymousUser', (), {
             'is_authenticated': False,
+            'is_active': True,  # DRF requiere este atributo
             'username': None,
             'rol': None,
             'id': None,
@@ -70,6 +71,7 @@ class UserDataMiddleware:
         user_data = request.session.get('user', {})
         request.user = type('User', (), {
             'is_authenticated': True,
+            'is_active': True,  # DRF requiere este atributo
             'username': user_data.get('nombre_usuario'),
             'rol': user_data.get('rol'),
             'id': user_data.get('id'),

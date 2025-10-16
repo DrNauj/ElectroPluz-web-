@@ -1,0 +1,127 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{% if product %}Editar Producto{% else %}Nuevo Producto{% endif %}</h1>
+        <a href="{% url 'dashboard:product_list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Volver
+        </a>
+    </div>
+
+    <div class="card dashboard-card">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <!-- Información básica -->
+                    <div class="col-md-8">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nombre del Producto</label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="name" 
+                                   name="name" 
+                                   value="{{ product.name|default:'' }}"
+                                   required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descripción</label>
+                            <textarea class="form-control" 
+                                      id="description" 
+                                      name="description" 
+                                      rows="4" 
+                                      required>{{ product.description|default:'' }}</textarea>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="category" class="form-label">Categoría</label>
+                                    <select class="form-select" id="category" name="category" required>
+                                        <option value="">Seleccione una categoría</option>
+                                        {% for category in categories %}
+                                        <option value="{{ category.id }}"
+                                                {% if product and product.category_id == category.id %}selected{% endif %}>
+                                            {{ category.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="price" class="form-label">Precio</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" 
+                                               class="form-control" 
+                                               id="price" 
+                                               name="price" 
+                                               value="{{ product.price|default:'' }}"
+                                               step="0.01" 
+                                               required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inventario y configuración -->
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">Inventario</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label for="stock" class="form-label">Stock Actual</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="stock" 
+                                           name="stock" 
+                                           value="{{ product.stock|default:0 }}"
+                                           required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label for="min_stock" class="form-label">Stock Mínimo</label>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           id="min_stock" 
+                                           name="min_stock" 
+                                           value="{{ product.min_stock|default:5 }}"
+                                           required>
+                                </div>
+
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" 
+                                               type="checkbox" 
+                                               id="is_active" 
+                                               name="is_active"
+                                               {% if not product or product.is_active %}checked{% endif %}>
+                                        <label class="form-check-label" for="is_active">Producto Activo</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-end mt-4">
+                    <button type="button" class="btn btn-outline-secondary me-2" onclick="window.history.back()">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        {% if product %}Guardar Cambios{% else %}Crear Producto{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

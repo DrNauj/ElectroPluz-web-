@@ -1,0 +1,121 @@
+/* Dashboard General */
+.dashboard-card {
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+
+/* Iconos y Badges */
+.stat-icon {
+    font-size: 2rem;
+    opacity: 0.8;
+}
+
+.badge-notification {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    padding: 0.25rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.75rem;
+}
+
+/* Tablas */
+.table-dashboard {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.table-dashboard thead th {
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.table-dashboard tbody tr:hover {
+    background-color: rgba(0,0,0,0.02);
+}
+
+/* Gráficos y Estadísticas */
+.stats-container {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+/* Alertas y Notificaciones */
+.alert-dashboard {
+    border-left: 4px solid;
+    border-radius: 4px;
+}
+
+.alert-dashboard.alert-warning {
+    border-left-color: #ffc107;
+}
+
+.alert-dashboard.alert-danger {
+    border-left-color: #dc3545;
+}
+
+/* Formularios */
+.form-dashboard .form-control {
+    border-radius: 8px;
+    border: 1px solid #ced4da;
+    padding: 0.5rem 1rem;
+}
+
+.form-dashboard .form-control:focus {
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,0.15);
+}
+
+/* Botones */
+.btn-dashboard {
+    border-radius: 8px;
+    padding: 0.5rem 1.5rem;
+    font-weight: 500;
+}
+
+/* Cards específicas */
+.quick-stats-card {
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.chart-card {
+    min-height: 300px;
+    margin-bottom: 1.5rem;
+}
+
+/* Footer */
+.footer {
+    background-color: #343a40;
+}
+
+.footer a {
+    color: rgba(255,255,255,0.8);
+    text-decoration: none;
+}
+
+.footer a:hover {
+    color: white;
+    text-decoration: none;
+}

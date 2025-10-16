@@ -1,7 +1,8 @@
 from django.test import TestCase
 from django.utils import timezone
 from .models import Producto, Categoria, HistorialInventario, Proveedor
-from .models_reporting import Auditoria, ReporteMensualProductos, Cupon
+from .models_reporting import Auditoria, ReporteMensualProductos
+from .models_cupones import Cupon
 
 
 class TestInventario(TestCase):

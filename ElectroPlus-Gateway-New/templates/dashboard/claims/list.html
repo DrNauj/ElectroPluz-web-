@@ -1,0 +1,103 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Reclamos</h1>
+    </div>
+
+    <div class="card dashboard-card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID Reclamo</th>
+                            <th>Cliente</th>
+                            <th>Pedido</th>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for claim in claims %}
+                        <tr>
+                            <td>{{ claim.id }}</td>
+                            <td>{{ claim.order.user.get_full_name }}</td>
+                            <td>{{ claim.order.id }}</td>
+                            <td>{{ claim.created_at|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                {% if claim.type == 'product_issue' %}
+                                <span class="badge bg-warning">Problema con producto</span>
+                                {% elif claim.type == 'shipping_issue' %}
+                                <span class="badge bg-info">Problema de envío</span>
+                                {% elif claim.type == 'wrong_product' %}
+                                <span class="badge bg-danger">Producto equivocado</span>
+                                {% elif claim.type == 'other' %}
+                                <span class="badge bg-secondary">Otro</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if claim.status == 'pending' %}
+                                <span class="badge bg-warning">Pendiente</span>
+                                {% elif claim.status == 'in_progress' %}
+                                <span class="badge bg-info">En Proceso</span>
+                                {% elif claim.status == 'resolved' %}
+                                <span class="badge bg-success">Resuelto</span>
+                                {% elif claim.status == 'rejected' %}
+                                <span class="badge bg-danger">Rechazado</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'dashboard:claim_detail' claim.id %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if perms.storefront.change_claim %}
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-success"
+                                            onclick="updateClaimStatus({{ claim.id }})">
+                                        <i class="bi bi-arrow-clockwise"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function updateClaimStatus(claimId) {
+    const newStatus = prompt('Ingrese el nuevo estado (pending/in_progress/resolved/rejected):');
+    if (newStatus) {
+        fetch(`/dashboard/reclamos/${claimId}/actualizar-estado/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                status: newStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

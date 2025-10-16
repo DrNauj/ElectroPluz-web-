@@ -1,0 +1,194 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'js/dashboard.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Panel de Control</h1>
+        <div class="btn-group">
+            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                Período: {{ period_label }}
+            </button>
+            <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="?period=today">Hoy</a></li>
+                <li><a class="dropdown-item" href="?period=week">Esta semana</a></li>
+                <li><a class="dropdown-item" href="?period=month">Este mes</a></li>
+                <li><a class="dropdown-item" href="?period=year">Este año</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Resumen de estadísticas -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Ventas Totales</h6>
+                    <h3 class="card-text">${{ period_stats.total_revenue|default:"0.00" }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Pedidos</h6>
+                    <h3 class="card-text">{{ period_stats.total_orders|default:"0" }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Productos Vendidos</h6>
+                    <h3 class="card-text">{{ period_stats.total_items|default:"0" }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6 class="card-title">Valor Promedio</h6>
+                    <h3 class="card-text">${{ period_stats.avg_order_value|default:"0.00" }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Ventas por período -->
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Ventas por Período</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="salesChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Productos más vendidos -->
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Productos Más Vendidos</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="topProductsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado de reclamos -->
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Estado de Reclamos</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="claimsChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventario bajo -->
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Inventario Bajo</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th>Stock Actual</th>
+                                    <th>Stock Mínimo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for product in low_stock_products %}
+                                <tr {% if product.stock < product.min_stock %}class="table-danger"{% endif %}>
+                                    <td>{{ product.name }}</td>
+                                    <td>{{ product.stock }}</td>
+                                    <td>{{ product.min_stock }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Datos para las gráficas (serán reemplazados por datos reales de la vista)
+const salesData = {{ sales_data|safe }};
+const topProductsData = {{ top_products_data|safe }};
+const claimsData = {{ claims_data|safe }};
+
+// Gráfica de ventas
+const salesChart = new Chart(
+    document.getElementById('salesChart'),
+    {
+        type: 'line',
+        data: {
+            labels: salesData.labels,
+            datasets: [{
+                label: 'Ventas',
+                data: salesData.values,
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        }
+    }
+);
+
+// Gráfica de productos más vendidos
+const topProductsChart = new Chart(
+    document.getElementById('topProductsChart'),
+    {
+        type: 'bar',
+        data: {
+            labels: topProductsData.labels,
+            datasets: [{
+                label: 'Unidades Vendidas',
+                data: topProductsData.values,
+                backgroundColor: 'rgb(54, 162, 235)'
+            }]
+        }
+    }
+);
+
+// Gráfica de estado de reclamos
+const claimsChart = new Chart(
+    document.getElementById('claimsChart'),
+    {
+        type: 'doughnut',
+        data: {
+            labels: claimsData.labels,
+            datasets: [{
+                data: claimsData.values,
+                backgroundColor: [
+                    'rgb(255, 99, 132)',
+                    'rgb(54, 162, 235)',
+                    'rgb(255, 205, 86)',
+                    'rgb(75, 192, 192)'
+                ]
+            }]
+        }
+    }
+);
+</script>
+{% endblock %}
+{% endblock %}

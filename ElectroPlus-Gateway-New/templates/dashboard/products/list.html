@@ -1,0 +1,89 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Productos</h1>
+        {% if perms.storefront.add_product %}
+        <a href="{% url 'dashboard:product_create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> Nuevo Producto
+        </a>
+        {% endif %}
+    </div>
+
+    <div class="card dashboard-card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre</th>
+                            <th>Categoría</th>
+                            <th>Precio</th>
+                            <th>Stock Total</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>{{ product.id }}</td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.category.name }}</td>
+                            <td>${{ product.price }}</td>
+                            <td>{{ product.stock }}</td>
+                            <td>
+                                {% if product.stock > 0 %}
+                                <span class="badge bg-success">En Stock</span>
+                                {% else %}
+                                <span class="badge bg-danger">Sin Stock</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group">
+                                    <a href="{% url 'dashboard:product_edit' product.id %}" 
+                                       class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    {% if perms.storefront.delete_product %}
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-danger"
+                                            onclick="deleteProduct({{ product.id }})">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function deleteProduct(productId) {
+    if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
+        fetch(`/dashboard/productos/${productId}/eliminar/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% load django_bootstrap5 %}
+
+{% block title %}{{ product.name }} - ElectroPlus{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'product_list' %}">Productos</a></li>
+        <li class="breadcrumb-item active">{{ product.name }}</li>
+    </ol>
+</nav>
+
+<div class="row">
+    <div class="col-md-6">
+        <img src="{{ product.image }}" class="img-fluid rounded" alt="{{ product.name }}">
+    </div>
+    <div class="col-md-6">
+        <h1 class="mb-3">{{ product.name }}</h1>
+        <p class="lead">{{ product.description }}</p>
+        
+        <div class="card mb-3">
+            <div class="card-body">
+                <h3 class="text-success mb-3">S/. {{ product.price }}</h3>
+                <p class="mb-2">
+                    <i class="bi bi-box-seam"></i>
+                    Stock disponible: {{ product.stock }}
+                </p>
+                
+                <form method="post" action="{% url 'storefront:add_to_cart' product.id %}" class="mt-4">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="quantity" class="form-label">Cantidad</label>
+                        <input type="number" class="form-control" id="quantity" name="quantity" 
+                               value="1" min="1" max="{{ product.stock }}">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                        <i class="bi bi-cart-plus"></i> Añadir al Carrito
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Características principales</h5>
+                <ul class="list-unstyled">
+                    <li><i class="bi bi-check-circle-fill text-success"></i> Garantía de 12 meses</li>
+                    <li><i class="bi bi-check-circle-fill text-success"></i> Envío a todo el país</li>
+                    <li><i class="bi bi-check-circle-fill text-success"></i> Soporte técnico especializado</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

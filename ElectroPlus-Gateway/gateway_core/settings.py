@@ -32,6 +32,17 @@ DEBUG = True
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
+# CORS settings
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF settings
+CSRF_TRUSTED_ORIGINS = ['http://localhost:8000', 'http://127.0.0.1:8000']
+CSRF_USE_SESSIONS = True
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SECURE = False  # Para desarrollo
+CSRF_COOKIE_SAMESITE = None  # Para desarrollo
+
 # Configuración de Microservicios
 MICROSERVICES = {
     'INVENTARIO': {
@@ -74,20 +85,16 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Eliminamos 'debug_toolbar' ya que no está instalado y está causando el error.
-    # 'debug_toolbar', # <--- COMENTADO/ELIMINADO
+    'corsheaders',
     'rest_framework',
     'gateway_app.apps.GatewayAppConfig',
     'storefront.apps.StorefrontConfig', # Frontend público (tienda)
-    # Las siguientes apps deben ser eliminadas si son solo microservicios
-    # 'sales.apps.SalesConfig', # Microservicio de Ventas
-    # 'inventory.apps.InventoryConfig', # Microservicio de Inventario
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    # 'debug_toolbar.middleware.DebugToolbarMiddleware', # <--- COMENTADO/ELIMINADO
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -240,13 +247,12 @@ REST_FRAMEWORK = {
 # ]
 
 # Se añaden estas configuraciones por si se están usando en otra parte
-LOGGING_CONFIG = None
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
         'simple': {
@@ -258,23 +264,25 @@ LOGGING = {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
-            'formatter': 'simple',
+            'formatter': 'verbose',
         },
-    },
-    'root': {
-        'handlers': ['console'],
-        'level': 'INFO',
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': 'gateway.log',
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
-            'level': os.getenv('DJANGO_LOG_LEVEL', 'INFO'),
-            'propagate': False,
+            'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': True,
         },
         'gateway_app': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'DEBUG',
-            'propagate': False,
-        },
-    },
+            'propagate': True,
+        }
+    }
 }

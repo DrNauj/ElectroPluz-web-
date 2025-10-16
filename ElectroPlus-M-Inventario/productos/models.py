@@ -23,7 +23,7 @@ class Categoria(models.Model):
             # Asegurar que el slug sea único
             counter = 1
             original_slug = self.slug
-            while Categoria.objects.filter(slug=self.slug).exists():
+            while Categoria.objects.filter(slug=self.slug).exclude(pk=self.pk).exists():
                 self.slug = f"{original_slug}-{counter}"
                 counter += 1
         super().save(*args, **kwargs)

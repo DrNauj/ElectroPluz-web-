@@ -1,0 +1,165 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Pedido #{{ order.id }}</h1>
+        <div class="btn-group">
+            {% if perms.storefront.change_order %}
+            <button type="button" 
+                    class="btn btn-outline-primary"
+                    onclick="updateOrderStatus({{ order.id }})">
+                <i class="bi bi-arrow-clockwise"></i> Actualizar Estado
+            </button>
+            {% endif %}
+            <a href="{% url 'dashboard:order_list' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Volver
+            </a>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Detalles del Cliente -->
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Información del Cliente</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Nombre:</dt>
+                        <dd class="col-sm-8">{{ order.user.get_full_name }}</dd>
+                        
+                        <dt class="col-sm-4">Email:</dt>
+                        <dd class="col-sm-8">{{ order.user.email }}</dd>
+                        
+                        <dt class="col-sm-4">Teléfono:</dt>
+                        <dd class="col-sm-8">{{ order.shipping_phone }}</dd>
+                        
+                        <dt class="col-sm-4">Dirección:</dt>
+                        <dd class="col-sm-8">
+                            {{ order.shipping_address }}<br>
+                            {{ order.shipping_city }}, {{ order.shipping_state }}<br>
+                            {{ order.shipping_postal_code }}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estado del Pedido -->
+        <div class="col-md-6 mb-4">
+            <div class="card dashboard-card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Estado del Pedido</h5>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Estado:</dt>
+                        <dd class="col-sm-8">
+                            {% if order.status == 'pending' %}
+                            <span class="badge bg-warning">Pendiente</span>
+                            {% elif order.status == 'processing' %}
+                            <span class="badge bg-info">Procesando</span>
+                            {% elif order.status == 'shipped' %}
+                            <span class="badge bg-primary">Enviado</span>
+                            {% elif order.status == 'delivered' %}
+                            <span class="badge bg-success">Entregado</span>
+                            {% elif order.status == 'cancelled' %}
+                            <span class="badge bg-danger">Cancelado</span>
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-sm-4">Fecha:</dt>
+                        <dd class="col-sm-8">{{ order.created_at|date:"d/m/Y H:i" }}</dd>
+                        
+                        <dt class="col-sm-4">Última actualización:</dt>
+                        <dd class="col-sm-8">{{ order.updated_at|date:"d/m/Y H:i" }}</dd>
+                        
+                        <dt class="col-sm-4">Método de pago:</dt>
+                        <dd class="col-sm-8">{{ order.get_payment_method_display }}</dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Productos -->
+    <div class="card dashboard-card mb-4">
+        <div class="card-header">
+            <h5 class="card-title mb-0">Productos</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Precio</th>
+                            <th>Cantidad</th>
+                            <th class="text-end">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order.items.all %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>${{ item.price }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td class="text-end">${{ item.get_total }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-end"><strong>Subtotal:</strong></td>
+                            <td class="text-end">${{ order.get_subtotal }}</td>
+                        </tr>
+                        {% if order.discount %}
+                        <tr>
+                            <td colspan="3" class="text-end"><strong>Descuento:</strong></td>
+                            <td class="text-end">-${{ order.discount }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td colspan="3" class="text-end"><strong>IVA (19%):</strong></td>
+                            <td class="text-end">${{ order.get_tax }}</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="text-end"><strong>Total:</strong></td>
+                            <td class="text-end"><strong>${{ order.total }}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+function updateOrderStatus(orderId) {
+    const newStatus = prompt('Ingrese el nuevo estado (pending/processing/shipped/delivered/cancelled):');
+    if (newStatus) {
+        fetch(`/dashboard/pedidos/${orderId}/actualizar-estado/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({
+                status: newStatus
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

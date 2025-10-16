@@ -3,7 +3,7 @@ Vistas relacionadas con la autenticación y manejo de sesiones.
 """
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
-from django.views.decorators.csrf import ensure_csrf_cookie
+from django.views.decorators.csrf import ensure_csrf_cookie, csrf_exempt
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -15,6 +15,7 @@ from .services.auth_service import authenticate_with_service
 
 logger = logging.getLogger(__name__)
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def login_api(request):
@@ -22,9 +23,9 @@ def login_api(request):
     API endpoint para autenticación de usuarios.
     """
     try:
-        data = json.loads(request.body)
-        username = data.get('username')
-        password = data.get('password')
+        data = request.data
+        username = data.get('username', request.POST.get('username'))
+        password = data.get('password', request.POST.get('password'))
     except json.JSONDecodeError:
         return Response({'error': 'Formato JSON inválido.'}, status=status.HTTP_400_BAD_REQUEST)
 

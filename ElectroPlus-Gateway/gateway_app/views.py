@@ -95,10 +95,32 @@ def login_api(request):
         request.session.modified = True
         logger.info(f"Usuario {username} autenticado correctamente. Rol: {user_data.get('rol')}")
 
+        # Determinar redirección según rol
+        redirect_url = '/'  # Default para clientes
+        if user_data.get('rol') == 'admin':
+            redirect_url = '/admin/dashboard/'
+        elif user_data.get('rol') == 'empleado':
+            redirect_url = '#'  # No redireccionar automáticamente, esperar selección
+
+        # Personalizar mensaje según rol
+        welcome_message = f"¡Bienvenido {user_data['nombre_usuario']}!"
+        if user_data.get('rol') == 'empleado':
+            welcome_message += " Por favor, seleccione su vista preferida."
+        elif user_data.get('rol') == 'admin':
+            welcome_message += " Accediendo al panel de administración."
+        else:
+            welcome_message += " Gracias por visitarnos."
+
         return Response({
             'success': True,
-            'message': 'Inicio de sesión exitoso.',
-            'user': {'username': user_data['nombre_usuario'], 'rol': user_data['rol']}
+            'message': welcome_message,
+            'user': {
+                'username': user_data['nombre_usuario'],
+                'rol': user_data['rol'],
+                'id': user_data['id']
+            },
+            'redirect_url': redirect_url,
+            'has_role_choice': user_data.get('rol') == 'empleado'  # Flag para indicar si mostrar selección de vista
         }, status=status.HTTP_200_OK)
     else:
         # 3. Fallo de autenticación

@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% load django_bootstrap5 %}
+
+{% block title %}Mi Perfil - ElectroPlus{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 mx-auto">
+            <h2 class="mb-4">Mi Perfil</h2>
+            
+            <div class="card">
+                <div class="card-body">
+                    <form id="profileForm" method="post">
+                        {% csrf_token %}
+                        
+                        <h5 class="card-title mb-4">Información Personal</h5>
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="first_name" class="form-label">Nombre</label>
+                                    <input type="text" class="form-control" id="first_name" name="first_name" 
+                                           value="{{ user.first_name }}">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="last_name" class="form-label">Apellidos</label>
+                                    <input type="text" class="form-control" id="last_name" name="last_name" 
+                                           value="{{ user.last_name }}">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email" 
+                                   value="{{ user.email }}" required>
+                        </div>
+                        
+                        <h5 class="card-title mb-4">Información de Envío</h5>
+                        <div class="mb-4">
+                            <label for="default_shipping_address" class="form-label">Dirección de Envío por Defecto</label>
+                            <textarea class="form-control" id="default_shipping_address" name="default_shipping_address" 
+                                      rows="3">{{ profile.default_shipping_address }}</textarea>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label for="default_phone" class="form-label">Teléfono de Contacto</label>
+                            <input type="tel" class="form-control" id="default_phone" name="default_phone" 
+                                   value="{{ profile.default_phone }}">
+                        </div>
+                        
+                        <div class="alert alert-success" style="display: none;" role="alert"></div>
+                        <div class="alert alert-danger" style="display: none;" role="alert"></div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.getElementById('profileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const form = this;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const successAlert = form.querySelector('.alert-success');
+    const errorAlert = form.querySelector('.alert-danger');
+    
+    try {
+        submitBtn.disabled = true;
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: {
+                'X-CSRFToken': form.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            successAlert.textContent = data.message;
+            successAlert.style.display = 'block';
+            errorAlert.style.display = 'none';
+            
+            // Scroll to alert
+            successAlert.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Hide success message after 3 seconds
+            setTimeout(() => {
+                successAlert.style.display = 'none';
+            }, 3000);
+        } else {
+            errorAlert.textContent = data.message || 'Ha ocurrido un error al actualizar el perfil.';
+            errorAlert.style.display = 'block';
+            successAlert.style.display = 'none';
+        }
+    } catch (error) {
+        errorAlert.textContent = 'Error de conexión. Por favor, intente nuevamente.';
+        errorAlert.style.display = 'block';
+        successAlert.style.display = 'none';
+    } finally {
+        submitBtn.disabled = false;
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}
