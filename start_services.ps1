@@ -67,11 +67,24 @@ function Clear-UsedPorts {
     )
     Write-Host "Verificando y limpiando puertos en uso..." -ForegroundColor Yellow
     foreach ($port in $ports) {
-        $processInfo = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue | 
+        $processInfo = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue |
                       Select-Object -ExpandProperty OwningProcess
         if ($processInfo) {
             Write-Host "Puerto $port en uso. Terminando proceso..." -ForegroundColor Yellow
-            Stop-Process -Id $processInfo -Force
+            try {
+                Stop-Process -Id $processInfo -Force -ErrorAction Stop
+                Write-Host "Proceso terminado exitosamente." -ForegroundColor Green
+            }
+            catch {
+                Write-Host "No se pudo terminar el proceso con Stop-Process. Intentando con taskkill..." -ForegroundColor Yellow
+                try {
+                    taskkill /PID $processInfo /F /T 2>$null
+                    Write-Host "Proceso terminado con taskkill." -ForegroundColor Green
+                }
+                catch {
+                    Write-Host "ERROR: No se pudo terminar el proceso en puerto $port. Puede que necesites ejecutar como administrador." -ForegroundColor Red
+                }
+            }
             Start-Sleep -Seconds 1
         }
     }
@@ -129,12 +142,7 @@ function Start-DjangoService {
     )
     
     Write-Host "Iniciando $serviceName en puerto $port..." -ForegroundColor Cyan
-    
-    if (Test-PortInUse $port) {
-        Write-Host "ERROR: Puerto $port ya está en uso!" -ForegroundColor Red
-        return $false
-    }
-    
+
     Set-Location $path
 
     # Crear archivo .env específico para el servicio
@@ -198,19 +206,19 @@ if (-not (Test-Path $venvPath)) {
 # Iniciar M-Inventario
 $inventarioPath = Join-Path $BASE_DIR "ElectroPlus-M-Inventario"
 if (-not (Start-DjangoService -serviceName "M-Inventario" -path $inventarioPath -port $INVENTARIO_PORT -secretKeyVar "INVENTARIO_SECRET_KEY")) {
-    exit 1
+    Write-Host "ERROR: No se pudo iniciar M-Inventario. Continuando..." -ForegroundColor Red
 }
 
 # Iniciar M-Ventas
 $ventasPath = Join-Path $BASE_DIR "ElectroPlus-M-Ventas"
 if (-not (Start-DjangoService -serviceName "M-Ventas" -path $ventasPath -port $VENTAS_PORT -secretKeyVar "VENTAS_SECRET_KEY")) {
-    exit 1
+    Write-Host "ERROR: No se pudo iniciar M-Ventas. Continuando..." -ForegroundColor Red
 }
 
 # Iniciar Gateway
 $gatewayPath = Join-Path $BASE_DIR "ElectroPlus-Gateway-New"
 if (-not (Start-DjangoService -serviceName "Gateway" -path $gatewayPath -port $GATEWAY_PORT -secretKeyVar "GATEWAY_SECRET_KEY")) {
-    exit 1
+    Write-Host "ERROR: No se pudo iniciar Gateway. Continuando..." -ForegroundColor Red
 }
 
 Write-Host "`nTodos los servicios están en ejecución:" -ForegroundColor Green

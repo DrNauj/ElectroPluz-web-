@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load django_bootstrap5 %}
 
-{% block title %}Productos - ElectroPlus{% endblock %}
+{% block title %}Productos - LibreCel{% endblock %}
 
 {% block content %}
 <!-- Hero/Welcome Section -->
@@ -9,12 +9,12 @@
     <div class="container">
         <div class="row align-items-center">
             <div class="col-lg-6">
-                <h1 class="display-4 fw-bold mb-3">Bienvenido a ElectroPlus</h1>
+                <h1 class="display-4 fw-bold mb-3">Bienvenido a LibreCel</h1>
                 <p class="lead mb-4">Descubre los mejores productos electrónicos con precios increíbles. Calidad garantizada y envío rápido.</p>
                 <a href="#productos" class="btn btn-light btn-lg">Explorar Productos</a>
             </div>
-            <div class="col-lg-6" style="position: relative;display: flex; justify-content: center; align-items: center;">
-                <img src="\static\img\Electroplus-icon-blackback.png" alt="ElectroPlus Store" class="img-fluid rounded" width="200vw" >
+                <div class="col-lg-6 hero-visual">
+                <img src="\static\img\LibreCel.png" alt="LibreCel Store" class="img-fluid rounded" width="400" >
             </div>
         </div>
     </div>
@@ -210,22 +210,5 @@
     </div>
 </div>
 
-<style>
-.hero-section {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.product-card {
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.product-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
-
-.card-img-top {
-    border-bottom: 1px solid #dee2e6;
-}
-</style>
+<!-- Estilos de la página movidos a `static/css/store.css` para evitar duplicación y mejorar cache -->
 {% endblock %}

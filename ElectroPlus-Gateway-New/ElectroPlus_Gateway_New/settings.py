@@ -28,9 +28,7 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
-# API Configuration
-INVENTORY_API_URL = 'http://localhost:8001/api'
-SALES_API_URL = 'http://localhost:8002/api'
+
 
 # Application definition
 

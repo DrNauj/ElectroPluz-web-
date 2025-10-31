@@ -19,6 +19,13 @@ function handleAuthForm(formId, action) {
             const data = await response.json();
 
             if (data.success) {
+                // Cerrar el modal correspondiente
+                const modalId = formId === 'loginForm' ? '#loginModal' : '#registerModal';
+                const modal = bootstrap.Modal.getInstance(document.querySelector(modalId));
+                if (modal) {
+                    modal.hide();
+                }
+
                 // Mostrar mensaje de éxito usando Bootstrap toast
                 const toast = new bootstrap.Toast(document.createElement('div'));
                 toast._element.classList.add('toast', 'position-fixed', 'top-0', 'end-0', 'm-3');
@@ -32,9 +39,9 @@ function handleAuthForm(formId, action) {
                 document.body.appendChild(toast._element);
                 toast.show();
 
-                // Redirigir después de un breve delay
+                // Recargar la página después de un breve delay para actualizar la navbar
                 setTimeout(() => {
-                    window.location.href = data.redirect_url;
+                    window.location.reload();
                 }, 1500);
             } else {
                 // Mostrar errores

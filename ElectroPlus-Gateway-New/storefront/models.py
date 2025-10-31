@@ -187,7 +187,7 @@ class Order(models.Model):
 
     def calculate_tax(self):
         """Calcula el IVA basado en el subtotal"""
-        return self.get_subtotal() * Decimal('0.19')  # 19% IVA
+        return self.get_subtotal() * Decimal('0.19')  # 19% IVA - Configurable en settings
 
     def calculate_total(self):
         """Calcula el total basado en subtotal, impuestos y descuento"""
@@ -200,8 +200,7 @@ class Order(models.Model):
 
     def save(self, *args, **kwargs):
         """Sobrescribe save para actualizar totales automáticamente"""
-        if self.pk:  # Solo si ya existe (para evitar error en creación)
-            self.update_totals()
+        self.update_totals()  # Calcular totales siempre, incluyendo creación
         super().save(*args, **kwargs)
 
     def __str__(self):

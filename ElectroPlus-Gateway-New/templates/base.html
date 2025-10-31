@@ -6,90 +6,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ElectroPlus - Tu Tienda de Electrónicos{% endblock %}</title>
+    <title>{% block title %}LibreCel - Tu Tienda de Electrónicos{% endblock %}</title>
     {% bootstrap_css %}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="{% static 'css/store.css' %}">
     <script src="{% static 'js/auth.js' %}"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.5rem;
-        }
-        .hero-section {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 60vh;
-        }
-        .product-card {
-            transition: all 0.3s ease;
-            border: none;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-        .product-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-        }
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-        }
-        .footer {
-            background: #2c3e50;
-            color: white;
-            padding: 3rem 0 1rem;
-            margin-top: 4rem;
-        }
-        .footer h5 {
-            color: #ecf0f1;
-            margin-bottom: 1.5rem;
-        }
-        .footer-links {
-            list-style: none;
-            padding: 0;
-        }
-        .footer-links li {
-            margin-bottom: 0.5rem;
-        }
-        .footer-links a {
-            color: #bdc3c7;
-            text-decoration: none;
-            transition: color 0.3s;
-        }
-        .footer-links a:hover {
-            color: #ecf0f1;
-        }
-        .social-links a {
-            color: #bdc3c7;
-            font-size: 1.2rem;
-            transition: color 0.3s;
-        }
-        .social-links a:hover {
-            color: #ecf0f1;
-        }
-        .dropdown-menu {
-            border: none;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        }
-        .badge {
-            font-size: 0.7rem;
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700display=swap" rel="stylesheet">
+    <!-- Estilos movidos a static/css/store.css -->
 </head>
 <body>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center" href="/">
-                <i class="fas fa-bolt text-warning me-2"></i>
-                ElectroPlus
+                <i class="librecel-icon"><img src="\static\img\LibreCel.png" alt="LibreCel Store" class="img-fluid rounded" width="50" ></i>
+                LibreCel
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -306,7 +238,7 @@
             <div class="row">
                 <div class="col-lg-3 mb-4">
                     <h5 class="mb-3">
-                        <i class="fas fa-bolt text-warning me-2"></i>ElectroPlus
+                        <i class="librecel-icon"><img src="\static\img\LibreCel.png" alt="LibreCel Store" class="img-fluid rounded" width="100" ></i>LibreCel
                     </h5>
                     <p class="mb-3">Tu tienda de confianza para productos electrónicos de calidad. Encontrarás los mejores precios y la mejor atención.</p>
                     <div class="social-links">
@@ -322,9 +254,7 @@
                     <ul class="footer-links">
                         <li><a href="{% url 'storefront:product_list' %}">Todos los Productos</a></li>
                         <li><a href="{% url 'storefront:product_list' %}?active_coupon=true">Ofertas Especiales</a></li>
-                        <li><a href="{% url 'storefront:product_list' %}?category=computadoras">Computadoras</a></li>
                         <li><a href="{% url 'storefront:product_list' %}?category=celulares">Celulares</a></li>
-                        <li><a href="{% url 'storefront:product_list' %}?category=videojuegos">Videojuegos</a></li>
                     </ul>
                 </div>
                 <div class="col-lg-3 mb-4">
@@ -353,7 +283,7 @@
                     <div class="mt-3">
                         <h6 class="text-light mb-2">Contáctanos</h6>
                         <p class="mb-1"><i class="fas fa-phone me-2"></i>+51 123 456 789</p>
-                        <p class="mb-1"><i class="fas fa-envelope me-2"></i>info@electroplus.com</p>
+                        <p class="mb-1"><i class="fas fa-envelope me-2"></i>info@librecel.com</p>
                         <p class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Lima, Perú</p>
                     </div>
                 </div>
@@ -361,7 +291,7 @@
             <hr class="my-4">
             <div class="row align-items-center">
                 <div class="col-md-6">
-                    <p class="mb-0">© 2025 ElectroPlus. Todos los derechos reservados.</p>
+                    <p class="mb-0">© 2025 LibreCel. Todos los derechos reservados.</p>
                 </div>
                 <div class="col-md-6 text-md-end">
                     <img src="https://via.placeholder.com/200x50?text=Metodos+de+Pago" alt="Métodos de pago" class="img-fluid" style="max-height: 30px;">

@@ -33,7 +33,7 @@ def register_view(request):
             return JsonResponse({
                 'success': True,
                 'redirect_url': 'storefront:product_list',
-                'message': '¡Registro exitoso! Bienvenido a ElectroPlus'
+                'message': '¡Registro exitoso! Bienvenido a LibreCel'
             })
         else:
             return JsonResponse({
